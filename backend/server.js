@@ -14,15 +14,20 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 // 2. MIDDLEWARE
-app.use(cors()); // Cho phép Web gọi API
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'], 
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/photos', express.static(UPLOADS_DIR));
 
 // 3. KẾT NỐI DATABASE
-mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/visual-memoir')
-    .then(() => console.log("✅ Đã kết nối MongoDB PWA"))
-    .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));
+const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/visual-memoir';
+mongoose.connect(mongoURI)
+    .then(() => console.log("✅ Đã kết nối MongoDB Cloud"))
+    .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));;
 
 const Diary = mongoose.model('Diary', {
     imagePath: String,
@@ -44,7 +49,7 @@ app.post('/api/analyze', async (req, res) => {
         }
 
         const cleanBase64 = image.replace(/^data:image\/\w+;base64,/, "").replace(/\s/g, "");
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Hoặc gemini-2.0-flash
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const systemInstruction = `Bạn là một người viết nhật ký chuyên nghiệp, tinh tế. 
         Nhiệm vụ: Viết DUY NHẤT một câu nhật ký tiếng Việt sâu sắc.
