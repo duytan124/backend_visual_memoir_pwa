@@ -20,7 +20,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/photos', express.static(UPLOADS_DIR));
 
 // 3. KẾT NỐI DATABASE
-mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/visual-memoir-pwa')
+mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/visual-memoir')
     .then(() => console.log("✅ Đã kết nối MongoDB PWA"))
     .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));
 
