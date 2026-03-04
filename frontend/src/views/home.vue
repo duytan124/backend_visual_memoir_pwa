@@ -6,32 +6,65 @@ const store = useDiaryStore();
 const previewUrl = ref(null);
 const selectedFileBase64 = ref(null);
 const userContext = ref('');
-const fileInput = ref(null); // Ref để điều khiển input file ẩn
+const fileInput = ref(null);
 
-// --- HÀM CHỌN ẢNH (DÙNG WEB API) ---
+// --- HÀM NÉN ẢNH (GIẢM ĐỘ TRỄ) ---
+const compressImage = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                // Giới hạn chiều rộng tối đa 1024px để giữ chất lượng vừa đủ
+                const MAX_WIDTH = 1024;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Nén thành định dạng JPEG với chất lượng 0.7 (70%)
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(compressedBase64);
+            };
+        };
+    });
+};
+
 const triggerFileInput = () => {
     fileInput.value.click();
 };
 
-const handleFileChange = (event) => {
+const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Kiểm tra định dạng
     if (!file.type.startsWith('image/')) {
         alert("Vui lòng chọn một file ảnh nhé!");
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const base64String = e.target.result;
-        previewUrl.value = base64String;
-        // Tách header ra để lấy chuỗi raw base64 nếu cần, 
-        // hoặc giữ nguyên tùy theo cách store.analyzeImage xử lý
-        selectedFileBase64.value = base64String.split(',')[1];
-    };
-    reader.readAsDataURL(file);
+    try {
+        // Thực hiện nén ảnh ngay khi chọn
+        const compressedBase64 = await compressImage(file);
+
+        previewUrl.value = compressedBase64;
+        // Lưu chuỗi base64 đã nén (tách header) để gửi API
+        selectedFileBase64.value = compressedBase64.split(',')[1];
+    } catch (error) {
+        console.error("Lỗi nén ảnh:", error);
+        alert("Không thể xử lý ảnh này, vui lòng thử ảnh khác.");
+    }
 };
 
 const createDiary = async () => {
@@ -43,17 +76,15 @@ const createDiary = async () => {
     try {
         store.isAnalyzing = true;
 
-        // Chuẩn bị chuỗi Base64 đầy đủ
         const fullBase64 = `data:image/jpeg;base64,${selectedFileBase64.value}`;
 
-        // 1. Gửi lên AI Gemini
+        // Gửi chuỗi đã nén lên AI và Database
         const aiContent = await store.analyzeImage(fullBase64, userContext.value);
 
         if (!aiContent) {
             throw new Error("Gemini không thể phản hồi vào lúc này.");
         }
 
-        // 2. Lưu vào Database
         const result = await store.addEntry(
             fullBase64,
             aiContent,
@@ -65,7 +96,7 @@ const createDiary = async () => {
             previewUrl.value = null;
             selectedFileBase64.value = null;
             userContext.value = '';
-            if (fileInput.value) fileInput.value.value = ''; // Reset input file
+            if (fileInput.value) fileInput.value.value = '';
         }
 
     } catch (error) {
