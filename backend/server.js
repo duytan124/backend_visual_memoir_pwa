@@ -14,26 +14,27 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 // 2. MIDDLEWARE
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'], 
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(cors()); // Mở rộng cho mọi nguồn để tránh lỗi CORS khi dùng điện thoại
+app.use(express.json({ limit: '20mb' })); // Nén ảnh rồi thì 20mb là quá đủ
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use('/photos', express.static(UPLOADS_DIR));
 
+// Trang chủ để test
+app.get('/', (req, res) => {
+    res.send('🚀 Visual Memoir API is Live and Running!');
+});
+
 // 3. KẾT NỐI DATABASE
-const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/visual-memoir';
+const mongoURI = process.env.MONGO_URI;
 mongoose.connect(mongoURI)
-    .then(() => console.log("✅ Đã kết nối MongoDB Cloud"))
-    .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));;
+    .then(() => console.log("✅ Kết nối MongoDB thành công"))
+    .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));
 
 const Diary = mongoose.model('Diary', {
     imagePath: String,
     content: String,
     userContext: String,
-    isFavorite: { type: Boolean, default: false }, // Mới: Thêm trạng thái yêu thích
+    isFavorite: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -44,46 +45,41 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 app.post('/api/analyze', async (req, res) => {
     try {
         const { image, context } = req.body;
-        if (!image || typeof image !== 'string') {
-            return res.status(400).json({ error: "Invalid image format" });
-        }
+        if (!image) return res.status(400).json({ error: "Thiếu dữ liệu ảnh" });
 
-        const cleanBase64 = image.replace(/^data:image\/\w+;base64,/, "").replace(/\s/g, "");
+        // Tách lấy phần raw base64 chuẩn xác hơn
+        const base64Data = image.includes(',') ? image.split(',')[1] : image;
+
+        // SỬA LỖI TÊN MODEL Ở ĐÂY
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const systemInstruction = `Bạn là một người viết nhật ký chuyên nghiệp, tinh tế. 
-        Nhiệm vụ: Viết DUY NHẤT một câu nhật ký tiếng Việt sâu sắc.
+        Nhiệm vụ: Viết DUY NHẤT một câu nhật ký tiếng Việt sâu sắc. 
         Yêu cầu: Không dùng 'Trong ảnh', không giải thích, dùng ngôn ngữ tự nhiên, ấm áp.`;
 
         const userContextReq = context && context.trim() !== ""
             ? `Dựa trên ý định của người dùng: "${context}".`
             : "Hãy tự cảm nhận bức ảnh theo cách tự nhiên nhất.";
 
-        const finalInstruction = `${systemInstruction}\n${userContextReq}\nHãy nhìn vào hình ảnh và viết câu nhật ký đó ngay bây giờ.`;
-
         const result = await model.generateContent([
-            finalInstruction,
-            { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } }
+            `${systemInstruction}\n${userContextReq}`,
+            { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
         ]);
 
         const response = await result.response;
         res.json({ text: response.text().trim() });
     } catch (error) {
         console.error("Lỗi Gemini:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "AI đang bận, thử lại sau nhé!" });
     }
 });
 
 // 5. ROUTES API
-
-// Lấy danh sách nhật ký
 app.get('/api/diaries', async (req, res) => {
     try {
         const diaries = await Diary.find().sort({ createdAt: -1 });
-
-        // Tự động tạo URL ảnh dựa trên host đang chạy (localhost hoặc domain thật)
-        const protocol = req.protocol;
         const host = req.get('host');
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
 
         const formattedDiaries = diaries.map(item => {
             const doc = item.toObject();
@@ -98,15 +94,14 @@ app.get('/api/diaries', async (req, res) => {
     }
 });
 
-// Lưu nhật ký mới
 app.post('/api/diaries', async (req, res) => {
     try {
         const { image, content, userContext } = req.body;
         let fileName = "";
 
-        if (image && image.startsWith('data:image')) {
+        if (image) {
             fileName = `diary_${Date.now()}.jpg`;
-            const base64Data = image.split(',')[1];
+            const base64Data = image.includes(',') ? image.split(',')[1] : image;
             fs.writeFileSync(path.join(UPLOADS_DIR, fileName), base64Data, 'base64');
         }
 
@@ -119,39 +114,34 @@ app.post('/api/diaries', async (req, res) => {
         await item.save();
         res.json(item);
     } catch (error) {
-        res.status(500).json({ error: "Lỗi lưu nhật ký" });
+        console.error("Lỗi lưu DB:", error);
+        res.status(500).json({ error: "Không thể lưu nhật ký vào Database" });
     }
 });
 
-// THÊM MỚI: Toggle trạng thái yêu thích (Thả tim)
+// Các route Delete và Patch giữ nguyên...
 app.patch('/api/diaries/:id/toggle-favorite', async (req, res) => {
     try {
         const diary = await Diary.findById(req.params.id);
-        if (!diary) return res.status(404).json({ error: "Không tìm thấy nhật ký" });
-
+        if (!diary) return res.status(404).json({ error: "Không tìm thấy" });
         diary.isFavorite = !diary.isFavorite;
         await diary.save();
         res.json(diary);
-    } catch (error) {
-        res.status(500).json({ error: "Lỗi khi cập nhật yêu thích" });
-    }
+    } catch (e) { res.status(500).send(); }
 });
 
-// Xóa nhật ký
 app.delete('/api/diaries/:id', async (req, res) => {
     try {
         const diary = await Diary.findByIdAndDelete(req.params.id);
-        if (diary && diary.imagePath) {
+        if (diary?.imagePath) {
             const filePath = path.join(UPLOADS_DIR, diary.imagePath);
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         }
-        res.json({ message: "Đã xóa thành công" });
-    } catch (error) {
-        res.status(500).json({ error: "Lỗi xóa" });
-    }
+        res.json({ message: "Xóa thành công" });
+    } catch (e) { res.status(500).send(); }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server PWA đang lắng nghe tại port ${PORT}`);
+app.listen(PORT, () => {
+    console.log(`🚀 Server đang chạy tại port ${PORT}`);
 });
