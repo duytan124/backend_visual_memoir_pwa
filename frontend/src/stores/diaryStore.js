@@ -86,17 +86,6 @@ export const useDiaryStore = defineStore('diary', {
             }
         },
 
-        async toggleFavorite(id) {
-            try {
-                const res = await axios.patch(`${API_URL}/diaries/${id}/toggle-favorite`);
-                const index = this.items.findIndex(item => item._id === id);
-                if (index !== -1) {
-                    this.items[index].isFavorite = res.data.isFavorite;
-                }
-            } catch (error) {
-                console.error("❌ Lỗi thả tim:", error);
-            }
-        },
 
         async deleteDiary(id) {
             if (!confirm("Bạn có chắc chắn muốn xóa kỷ niệm này?")) return;

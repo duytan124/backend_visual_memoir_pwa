@@ -78,7 +78,7 @@ const formatDate = (dateStr) => {
                             </p>
 
                             <div class="card-footer">
-                                <span class="read-more" @click="$router.push(`./detail/${item._id}`)">Xem chi tiết</span>
+                                <span class="read-more" @click="$router.push(`/detail/${item._id}`)">Xem chi tiết</span>
 
                                 <button class="btn-share-mobile" @click.stop="handleMobileShare(item)">
                                     <i class="fa-solid fa-arrow-up-from-bracket"></i>
