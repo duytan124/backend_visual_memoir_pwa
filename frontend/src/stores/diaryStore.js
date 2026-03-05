@@ -5,9 +5,21 @@ import axios from 'axios';
 const BASE_URL = 'https://backend-visual-memoir-pwa.onrender.com';
 const API_URL = `${BASE_URL}/api`;
 
+const getOrCreateDeviceId = () => {
+    let id = localStorage.getItem('visual_memoir_device_id');
+    if (!id) {
+        id = 'device_' + Math.random().toString(36).substr(2, 9) + Date.now();
+        localStorage.setItem('visual_memoir_device_id', id);
+    }
+    return id;
+};
+
+const DEVICE_ID = getOrCreateDeviceId();
+
 export const useDiaryStore = defineStore('diary', {
     state: () => ({
         items: [],
+        deviceId: DEVICE_ID,
         isAnalyzing: false,
     }),
 
@@ -17,39 +29,31 @@ export const useDiaryStore = defineStore('diary', {
 
     actions: {
         /**
-         * Xử lý đường dẫn ảnh cho Web
+         * Lấy hoặc Tạo Device ID duy nhất cho trình duyệt/điện thoại này
          */
-        getDisplayPath(path) {
-            if (!path) return 'https://via.placeholder.com/400x300?text=No+Image';
-
-            if (path.startsWith('http') || path.startsWith('data:')) {
-                return path;
+        getDeviceId() {
+            let id = localStorage.getItem('visual_memoir_device_id');
+            if (!id) {
+                // Tạo một chuỗi ngẫu nhiên kết hợp với timestamp
+                id = 'dev_' + Math.random().toString(36).substring(2, 11) + Date.now();
+                localStorage.setItem('visual_memoir_device_id', id);
             }
-
-            // Nối với đường dẫn server mới trên Render
-            return `${BASE_URL}/photos/${path}`;
+            return id;
         },
 
-        async shareEntry(item) {
-            if (!navigator.share) {
-                alert("Trình duyệt của bạn không hỗ trợ chia sẻ trực tiếp.");
-                return;
-            }
-
-            try {
-                await navigator.share({
-                    title: 'Kỷ niệm từ Visual Memoir',
-                    text: `"${item.content}"`,
-                    url: window.location.origin,
-                });
-            } catch (error) {
-                console.log("Hủy chia sẻ hoặc lỗi:", error);
-            }
+        getDisplayPath(path) {
+            if (!path) return 'https://via.placeholder.com/400x300?text=No+Image';
+            if (path.startsWith('http') || path.startsWith('data:')) return path;
+            return `${BASE_URL}/photos/${path}`;
         },
 
         async fetchAll() {
             try {
-                const res = await axios.get(`${API_URL}/diaries`);
+                const deviceId = this.getDeviceId();
+                // Gửi deviceId lên thông qua params để Backend lọc
+                const res = await axios.get(`${API_URL}/diaries`, {
+                    params: { deviceId }
+                });
                 this.items = res.data;
             } catch (error) {
                 console.error("❌ Lỗi tải dữ liệu:", error.message);
@@ -58,10 +62,12 @@ export const useDiaryStore = defineStore('diary', {
 
         async addEntry(base64Image, content, context) {
             try {
+                const deviceId = this.getDeviceId();
                 const res = await axios.post(`${API_URL}/diaries`, {
                     image: base64Image,
                     content: content || "",
-                    userContext: context || ""
+                    userContext: context || "",
+                    deviceId: deviceId // Lưu kèm deviceId khi tạo mới
                 });
                 this.items.unshift(res.data);
                 return res.data;
@@ -86,10 +92,8 @@ export const useDiaryStore = defineStore('diary', {
             }
         },
 
-
         async deleteDiary(id) {
             if (!confirm("Bạn có chắc chắn muốn xóa kỷ niệm này?")) return;
-
             try {
                 await axios.delete(`${API_URL}/diaries/${id}`);
                 this.items = this.items.filter(item => item._id !== id);

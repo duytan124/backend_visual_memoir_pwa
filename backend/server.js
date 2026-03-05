@@ -30,13 +30,21 @@ mongoose.connect(mongoURI)
     .then(() => console.log("✅ Kết nối MongoDB thành công"))
     .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));
 
-const Diary = mongoose.model('Diary', {
+// Định nghĩa cấu trúc (Schema)
+const diarySchema = new mongoose.Schema({
     imagePath: String,
     content: String,
     userContext: String,
     isFavorite: { type: Boolean, default: false },
+    deviceId: { type: String, required: true }, // Bắt buộc phải có để tách dữ liệu
     createdAt: { type: Date, default: Date.now }
 });
+
+// Tạo Index để khi tìm kiếm theo deviceId sẽ cực nhanh
+diarySchema.index({ deviceId: 1, createdAt: -1 });
+
+// Tạo Model từ Schema trên
+const Diary = mongoose.model('Diary', diarySchema);
 
 // 4. LOGIC GEMINI AI
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -50,7 +58,6 @@ app.post('/api/analyze', async (req, res) => {
         // Tách lấy phần raw base64 chuẩn xác hơn
         const base64Data = image.includes(',') ? image.split(',')[1] : image;
 
-        // SỬA LỖI TÊN MODEL Ở ĐÂY
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const systemInstruction = `Bạn là một người viết nhật ký chuyên nghiệp, tinh tế. 
@@ -74,10 +81,17 @@ app.post('/api/analyze', async (req, res) => {
     }
 });
 
-// 5. ROUTES API
+// ROUTES API
 app.get('/api/diaries', async (req, res) => {
     try {
-        const diaries = await Diary.find().sort({ createdAt: -1 });
+        const { deviceId } = req.query;
+
+        if (!deviceId) {
+            return res.status(400).json({ error: "Thiếu mã định danh thiết bị (deviceId)" });
+        }
+
+        const diaries = await Diary.find({ deviceId }).sort({ createdAt: -1 });
+
         const host = req.get('host');
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
 
@@ -96,9 +110,13 @@ app.get('/api/diaries', async (req, res) => {
 
 app.post('/api/diaries', async (req, res) => {
     try {
-        const { image, content, userContext } = req.body;
-        let fileName = "";
+        const { image, content, userContext, deviceId } = req.body;
 
+        if (!deviceId) {
+            return res.status(400).json({ error: "Thiếu mã định danh thiết bị để lưu bài" });
+        }
+
+        let fileName = "";
         if (image) {
             fileName = `diary_${Date.now()}.jpg`;
             const base64Data = image.includes(',') ? image.split(',')[1] : image;
@@ -108,7 +126,8 @@ app.post('/api/diaries', async (req, res) => {
         const item = new Diary({
             imagePath: fileName,
             content: content || "",
-            userContext: userContext || ""
+            userContext: userContext || "",
+            deviceId: deviceId
         });
 
         await item.save();
@@ -117,17 +136,6 @@ app.post('/api/diaries', async (req, res) => {
         console.error("Lỗi lưu DB:", error);
         res.status(500).json({ error: "Không thể lưu nhật ký vào Database" });
     }
-});
-
-// Các route Delete và Patch giữ nguyên...
-app.patch('/api/diaries/:id/toggle-favorite', async (req, res) => {
-    try {
-        const diary = await Diary.findById(req.params.id);
-        if (!diary) return res.status(404).json({ error: "Không tìm thấy" });
-        diary.isFavorite = !diary.isFavorite;
-        await diary.save();
-        res.json(diary);
-    } catch (e) { res.status(500).send(); }
 });
 
 app.delete('/api/diaries/:id', async (req, res) => {

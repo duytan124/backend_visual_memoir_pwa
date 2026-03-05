@@ -10,12 +10,10 @@ const DiarySchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    // Lưu ngữ cảnh người dùng đã nhập (Input gốc)
     userContext: {
         type: String,
         trim: true
     },
-    // Lưu lại bản gốc AI tạo ra (để đối chiếu sau khi người dùng sửa)
     aiGeneratedContent: {
         type: String
     },
@@ -23,11 +21,11 @@ const DiarySchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
-    mood: {
+    deviceId:
+    {
         type: String,
-        enum: ['vui vẻ', 'nhẹ nhàng', 'suy tư', 'hào hứng', 'khác'],
-        default: 'nhẹ nhàng'
-    }
+        required: true
+    },
 }, {
     timestamps: true
 });
