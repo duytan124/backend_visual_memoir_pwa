@@ -8,6 +8,10 @@
       <span class="icon">📜</span>
       <span>Lịch sử</span>
     </router-link>
+    <router-link to="/favorite" class="nav-item" active-class="active">
+      <span class="icon">❤️</span>
+      <span>Yêu thích</span>
+    </router-link>
   </nav>
 </template>
 
