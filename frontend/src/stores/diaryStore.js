@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 
-// THAY ĐỔI TẠI ĐÂY: Dùng URL deploy thực tế thay vì localhost
 const BASE_URL = 'https://backend-visual-memoir-pwa.onrender.com';
 const API_URL = `${BASE_URL}/api`;
 
@@ -21,6 +20,7 @@ export const useDiaryStore = defineStore('diary', {
         items: [],
         deviceId: DEVICE_ID,
         isAnalyzing: false,
+        currentTags: [], // MỚI: Lưu tags AI vừa phân tích để gửi đi khi addEntry
     }),
 
     getters: {
@@ -28,19 +28,11 @@ export const useDiaryStore = defineStore('diary', {
     },
 
     actions: {
-        /**
-         * Lấy hoặc Tạo Device ID duy nhất cho trình duyệt/điện thoại này
-         */
         getDeviceId() {
-            let id = localStorage.getItem('visual_memoir_device_id');
-            if (!id) {
-                // Tạo một chuỗi ngẫu nhiên kết hợp với timestamp
-                id = 'dev_' + Math.random().toString(36).substring(2, 11) + Date.now();
-                localStorage.setItem('visual_memoir_device_id', id);
-            }
-            return id;
+            return DEVICE_ID;
         },
 
+        // CẬP NHẬT: Ưu tiên trả về link trực tiếp (Cloudinary) nếu có
         getDisplayPath(path) {
             if (!path) return 'https://via.placeholder.com/400x300?text=No+Image';
             if (path.startsWith('http') || path.startsWith('data:')) return path;
@@ -50,7 +42,6 @@ export const useDiaryStore = defineStore('diary', {
         async fetchAll() {
             try {
                 const deviceId = this.getDeviceId();
-                // Gửi deviceId lên thông qua params để Backend lọc
                 const res = await axios.get(`${API_URL}/diaries`, {
                     params: { deviceId }
                 });
@@ -60,6 +51,7 @@ export const useDiaryStore = defineStore('diary', {
             }
         },
 
+        // GIỮ NGUYÊN cấu trúc addEntry nhưng thêm gửi kèm Tags và isFavorite
         async addEntry(base64Image, content, context) {
             try {
                 const deviceId = this.getDeviceId();
@@ -67,15 +59,19 @@ export const useDiaryStore = defineStore('diary', {
                     image: base64Image,
                     content: content || "",
                     userContext: context || "",
-                    deviceId: deviceId // Lưu kèm deviceId khi tạo mới
+                    deviceId: deviceId,
+                    tags: this.currentTags, // Gửi kèm tags
+                    isFavorite: true       // Mặc định cho vào Favorite để hiện ở trang mới
                 });
                 this.items.unshift(res.data);
+                this.currentTags = []; // Reset sau khi lưu
                 return res.data;
             } catch (error) {
                 console.error("❌ Lỗi lưu nhật ký:", error.message);
             }
         },
 
+        // GIỮ NGUYÊN analyzeImage nhưng hứng thêm mảng Tags từ AI trả về
         async analyzeImage(base64Image, userContext) {
             this.isAnalyzing = true;
             try {
@@ -83,12 +79,33 @@ export const useDiaryStore = defineStore('diary', {
                     image: base64Image,
                     context: userContext || ""
                 });
+
+                // Lưu tags vào state nếu AI trả về mảng tags
+                if (response.data.tags) {
+                    this.currentTags = response.data.tags;
+                }
+
                 return response.data.text;
             } catch (error) {
                 console.error("❌ Lỗi AI:", error.message);
                 throw error;
             } finally {
                 this.isAnalyzing = false;
+            }
+        },
+
+        // MỚI: Thêm hàm để thả tim/bỏ thích nhanh trên giao diện
+        async toggleFavorite(id) {
+            try {
+                const item = this.items.find(i => i._id === id);
+                if (item) {
+                    const newStatus = !item.isFavorite;
+                    // Gọi API patch (nếu bạn đã viết ở backend)
+                    await axios.patch(`${API_URL}/diaries/${id}`, { isFavorite: newStatus });
+                    item.isFavorite = newStatus;
+                }
+            } catch (error) {
+                console.error("❌ Lỗi cập nhật yêu thích:", error);
             }
         },
 
