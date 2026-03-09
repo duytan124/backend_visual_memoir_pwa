@@ -69,7 +69,8 @@ const formatDate = (dateStr) => {
 
                     <div class="entry-card">
                         <div class="image-wrapper" @click="$router.push(`/detail/${item._id}`)">
-                            <img :src="convertPath(item.imagePath)" alt="Memory" loading="lazy" />
+                           <img :src="convertPath(item.imagePath)" alt="Memory" crossorigin="anonymous"
+                                loading="eager" />
                         </div>
 
                         <div class="text-wrapper">
