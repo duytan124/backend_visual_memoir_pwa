@@ -10,7 +10,7 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 const app = express();
-const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com/";
+const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com/api/diaries";
 
 // 1. CẤU HÌNH CLOUDINARY
 cloudinary.config({
