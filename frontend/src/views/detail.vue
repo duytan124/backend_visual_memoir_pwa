@@ -70,7 +70,7 @@ const handleDelete = async () => {
 
         <main class="content-container">
             <div class="image-wrapper">
-                <img :src="convertPath(item.imagePath)" alt="Diary photo" />
+               <img :src="convertPath(item.imagePath)" alt="Memory" crossorigin="anonymous" loading="eager" />
                 <div class="time-tag">{{ formatDate(item.createdAt) }}</div>
             </div>
 
