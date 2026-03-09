@@ -2,14 +2,15 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const axios = require('axios');
 require('dotenv').config();
 
 // MỚI: Thêm các thư viện Cloudinary
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
-
 const app = express();
+const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com/";
 
 // 1. CẤU HÌNH CLOUDINARY
 cloudinary.config({
@@ -182,6 +183,13 @@ app.delete('/api/diaries/:id', async (req, res) => {
         res.json({ message: "Xóa thành công" });
     } catch (e) { res.status(500).send(); }
 });
+
+// 6. GIỮ SERVER LUÔN "THỨC" TRÊN RENDER.COM
+setInterval(() => {
+    axios.get(BACKEND_URL)
+        .then(() => console.log("Self-ping: Server is awake!"))
+        .catch((err) => console.error("Self-ping error:", err.message));
+}, 10 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
