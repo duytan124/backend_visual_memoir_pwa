@@ -6,8 +6,6 @@ require('dotenv').config();
 
 // MỚI: Thêm các thư viện Cloudinary
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const multer = require('multer');
 const app = express();
 const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com/api/diaries";
 
@@ -17,16 +15,6 @@ cloudinary.config({
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
-
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'visual-memoir', // Tên thư mục trên Cloudinary
-        allowed_formats: ['jpg', 'png', 'jpeg'],
-    },
-});
-
-const upload = multer({ storage: storage });
 
 // 2. MIDDLEWARE
 app.use(cors());
@@ -46,6 +34,7 @@ mongoose.connect(mongoURI)
 
 const diarySchema = new mongoose.Schema({
     imagePath: String,
+    publicId: String,
     content: String,
     userContext: String,
     deviceId: { type: String, required: true },
@@ -88,7 +77,7 @@ app.post('/api/analyze', async (req, res) => {
 
 });
 
-// 5. ROUTES API ĐÃ ĐIỀU CHỈNH
+// 5. ROUTES API cho Diary
 app.get('/api/diaries', async (req, res) => {
     try {
         const { deviceId } = req.query;
@@ -101,46 +90,53 @@ app.get('/api/diaries', async (req, res) => {
     }
 });
 
-// Route lưu bài viết (Hỗ trợ cả Base64 từ Tân)
+// Route lưu nhật kí
 app.post('/api/diaries', async (req, res) => {
     try {
-        const { image, content, userContext, deviceId} = req.body;
+        const { image, content, userContext, deviceId } = req.body;
 
-        if (!deviceId) {
-            return res.status(400).json({ error: "Thiếu mã định danh thiết bị để lưu bài" });
-        }
-
-        let finalImagePath = "";
-
-        if (image) {
-            const uploadRes = await cloudinary.uploader.upload(image, {
-                folder: 'visual-memoir',
-                resource_type: 'image'
-            });
-            finalImagePath = uploadRes.secure_url;
-        }
-
-        const item = new Diary({
-            imagePath: finalImagePath,
-            content: content || "",
-            userContext: userContext || "",
-            deviceId: deviceId,
+        const uploadResponse = await cloudinary.uploader.upload(image, {
+            folder: `visual_memoir/${deviceId}`,
+            resource_type: "image"
         });
 
-        await item.save();
-        res.json(item);
+        const newDiary = new Diary({
+            imagePath: uploadResponse.secure_url,
+            content,
+            userContext,
+            deviceId,
+            publicId: uploadResponse.public_id
+        });
+
+        await newDiary.save();
+        res.status(201).json(newDiary);
     } catch (error) {
-        console.error("Lỗi lưu DB hoặc Cloudinary:", error);
-        res.status(500).json({ error: "Không thể lưu nhật ký" });
+        console.error(error);
+        res.status(500).send("Lỗi upload");
     }
 });
 
-// Route xóa (Xóa cả trên Cloudinary - Tùy chọn)
+// Route xóa nhật kí
 app.delete('/api/diaries/:id', async (req, res) => {
     try {
+        const diary = await Diary.findById(req.params.id);
+        if (!diary) return res.status(404).json({ error: "Không tìm thấy kỷ niệm" });
+
+        // Xóa trên Cloudinary trước
+        if (diary.publicId) {
+            const cloudRes = await cloudinary.uploader.destroy(diary.publicId);
+            if (cloudRes.result !== 'ok') {
+                console.warn(`Cloudinary xóa không thành công: ${diary.publicId}`);
+            }
+        }
+
+        // Luôn xóa trong DB sau khi đã thử xóa trên Cloud
         await Diary.findByIdAndDelete(req.params.id);
-        res.json({ message: "Xóa thành công" });
-    } catch (e) { res.status(500).send(); }
+
+        res.json({ message: "Xóa thành công kỷ niệm" });
+    } catch (e) {
+        res.status(500).json({ error: "Lỗi hệ thống khi xóa" });
+    }
 });
 
 // 6. GIỮ SERVER LUÔN "THỨC" TRÊN RENDER.COM
