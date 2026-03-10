@@ -35,8 +35,12 @@ export const useDiaryStore = defineStore('diary', {
 
         getDisplayPath(path) {
             if (!path) return 'https://via.placeholder.com/400x300?text=No+Image';
-            if (path.startsWith('http') || path.startsWith('data:')) return path;
-            return `${BASE_URL}/photos/${path}`;
+
+            if (path.startsWith('http') || path.startsWith('data:')) {
+                return path;
+            }
+
+            return `${BASE_URL}/${path}`;
         },
 
         async fetchAll() {
