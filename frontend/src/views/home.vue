@@ -168,6 +168,11 @@ const createDiary = async () => {
 </template>
 
 <style scoped>
+body.keyboard-open {
+    position: fixed;
+    width: 100%;
+}
+
 .context-box {
     margin-top: 24px;
     background: white;
@@ -195,6 +200,7 @@ const createDiary = async () => {
     font-size: 16px;
     resize: none;
     transition: all 0.2s;
+    touch-action: manipulation;
 }
 
 .context-box textarea:focus {
