@@ -7,7 +7,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pwa-192x192.png', 'pwa-512x512.png', 'favicon.ico'],
+      includeAssets: ['pwa-192x192.svg', 'pwa-512x512.svg', 'favicon.ico'],
       manifest: {
         name: 'Visual Memoir AI',
         short_name: 'MemoirAI',
@@ -24,6 +24,38 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/svg',
             purpose: 'any maskable'
+          }
+        ]
+      },
+      // --- PHẦN CẦN THÊM ĐỂ CHẠY OFFLINE ---
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'], // Cache tất cả tài nguyên build
+        runtimeCaching: [
+          {
+            // Cache hình ảnh từ Cloudinary
+            urlPattern: ({ url }) => url.host === 'res.cloudinary.com',
+            handler: 'CacheFirst', // Ưu tiên lấy trong bộ nhớ máy
+            options: {
+              cacheName: 'cloudinary-images',
+              expiration: {
+                maxEntries: 50, // Giữ tối đa 50 ảnh
+                maxAgeSeconds: 30 * 24 * 60 * 60 // Lưu trong 30 ngày
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            // Cache dữ liệu danh sách kỷ niệm từ Backend Render
+            urlPattern: ({ url }) => url.origin === 'https://backend-visual-memoir-pwa.onrender.com/api/diaries', // Thay bằng link thật của Tân
+            handler: 'StaleWhileRevalidate', // Lấy dữ liệu cũ hiện ra trước, sau đó cập nhật dữ liệu mới sau
+            options: {
+              cacheName: 'api-data-cache',
+              expiration: {
+                maxEntries: 100
+              }
+            }
           }
         ]
       }

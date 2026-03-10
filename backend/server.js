@@ -45,11 +45,9 @@ mongoose.connect(mongoURI)
     .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));
 
 const diarySchema = new mongoose.Schema({
-    imagePath: String, // Bây giờ sẽ lưu URL đầy đủ của Cloudinary
+    imagePath: String,
     content: String,
     userContext: String,
-    isFavorite: { type: Boolean, default: false },
-    tags: [String], // Lưu thêm tags cho đẹp như mockup
     deviceId: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
 });
@@ -64,59 +62,28 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 app.post('/api/analyze', async (req, res) => {
 
     try {
-
         const { image, context } = req.body;
-
         if (!image) return res.status(400).json({ error: "Thiếu dữ liệu ảnh" });
-
-
-
-        // Tách lấy phần raw base64 chuẩn xác hơn
-
         const base64Data = image.includes(',') ? image.split(',')[1] : image;
-
-
-
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-
-
         const systemInstruction = `Bạn là một người viết nhật ký chuyên nghiệp, tinh tế. 
-
         Nhiệm vụ: Viết DUY NHẤT một câu nhật ký tiếng Việt sâu sắc. 
-
         Yêu cầu: Không dùng 'Trong ảnh', không giải thích, dùng ngôn ngữ tự nhiên, ấm áp.`;
 
-
-
         const userContextReq = context && context.trim() !== ""
-
             ? `Dựa trên ý định của người dùng: "${context}".`
-
             : "Hãy tự cảm nhận bức ảnh theo cách tự nhiên nhất.";
 
-
-
         const result = await model.generateContent([
-
             `${systemInstruction}\n${userContextReq}`,
-
             { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
-
         ]);
 
-
-
         const response = await result.response;
-
         res.json({ text: response.text().trim() });
-
     } catch (error) {
-
         console.error("Lỗi Gemini:", error);
-
         res.status(500).json({ error: "AI đang bận, thử lại sau nhé!" });
-
     }
 
 });
@@ -128,7 +95,6 @@ app.get('/api/diaries', async (req, res) => {
         if (!deviceId) return res.status(400).json({ error: "Thiếu deviceId" });
 
         const diaries = await Diary.find({ deviceId }).sort({ createdAt: -1 });
-        // Không cần map protocol/host nữa vì imagePath đã là link Cloudinary hoàn chỉnh
         res.json(diaries);
     } catch (error) {
         res.status(500).json({ error: "Lỗi lấy dữ liệu" });
@@ -138,7 +104,7 @@ app.get('/api/diaries', async (req, res) => {
 // Route lưu bài viết (Hỗ trợ cả Base64 từ Tân)
 app.post('/api/diaries', async (req, res) => {
     try {
-        const { image, content, userContext, deviceId, tags } = req.body;
+        const { image, content, userContext, deviceId} = req.body;
 
         if (!deviceId) {
             return res.status(400).json({ error: "Thiếu mã định danh thiết bị để lưu bài" });
@@ -147,24 +113,18 @@ app.post('/api/diaries', async (req, res) => {
         let finalImagePath = "";
 
         if (image) {
-            // Giữ nguyên cách Tân xử lý Base64
-            // Upload trực tiếp chuỗi Base64 lên Cloudinary
             const uploadRes = await cloudinary.uploader.upload(image, {
-                folder: 'visual-memoir', // Tên thư mục trên Cloudinary
+                folder: 'visual-memoir',
                 resource_type: 'image'
             });
-
-            // Lấy URL an toàn (https) mà Cloudinary trả về
             finalImagePath = uploadRes.secure_url;
         }
 
         const item = new Diary({
-            imagePath: finalImagePath, // Lưu URL đám mây, không lo bị xóa khi deploy
+            imagePath: finalImagePath,
             content: content || "",
             userContext: userContext || "",
             deviceId: deviceId,
-            tags: tags || [], // Lưu thêm tags từ AI
-            isFavorite: true  // Mặc định cho vào mục yêu thích để test trang Favorite
         });
 
         await item.save();

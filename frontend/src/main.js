@@ -2,24 +2,28 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import router from './router';
 import App from './App.vue';
-
-// Import CSS tổng (để đảm bảo giao diện đồng bộ)
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import './style.css';
 
 // ĐĂNG KÝ SERVICE WORKER (Dành cho PWA)
 import { registerSW } from 'virtual:pwa-register';
 
+// 1. Khởi tạo Pinia và cài Plugin lưu trữ
+const pinia = createPinia()
+pinia.use(piniaPluginPersistedstate)
+
 const app = createApp(App);
 
-app.use(createPinia());
+// 2. Sử dụng biến pinia đã cài plugin (Sửa lỗi dùng createPinia() lần 2 ở đây)
+app.use(pinia);
 app.use(router);
 
-// Tự động cập nhật ứng dụng khi có phiên bản mới
+// Tự động cập nhật ứng dụng
 registerSW({
     immediate: true,
     onNeedRefresh() {
         if (confirm('Ứng dụng đã có bản cập nhật mới. Bạn có muốn làm mới không?')) {
-            location.reload();
+            window.location.reload();
         }
     }
 });
