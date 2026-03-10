@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       // Các tài nguyên tĩnh luôn được ưu tiên cache
-      includeAssets: ['favicon.ico', 'pwa-192x192.svg', 'pwa-512x512.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'pwa-192x192.jpg', 'pwa-512x512.jpg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Visual Memoir AI',
         short_name: 'MemoirAI',
@@ -18,14 +18,14 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: '/pwa-192x192.svg',
+            src: '/pwa-192x192.jpg',
             sizes: '192x192',
-            type: 'image/svg'
+            type: 'image/jpeg'
           },
           {
-            src: '/pwa-512x512.svg',
+            src: '/pwa-512x512.jpg',
             sizes: '512x512',
-            type: 'image/svg',
+            type: 'image/jpeg',
             purpose: 'any maskable'
           }
         ]
