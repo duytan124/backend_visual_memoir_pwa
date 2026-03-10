@@ -168,7 +168,6 @@ const createDiary = async () => {
 </template>
 
 <style scoped>
-/* Toàn bộ CSS giữ nguyên như file cũ của bạn */
 .context-box {
     margin-top: 24px;
     background: white;
@@ -193,7 +192,7 @@ const createDiary = async () => {
     border-radius: 12px;
     padding: 12px;
     font-family: inherit;
-    font-size: 1rem;
+    font-size: 16px;
     resize: none;
     transition: all 0.2s;
 }
