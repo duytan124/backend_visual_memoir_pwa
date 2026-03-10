@@ -7,12 +7,15 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pwa-192x192.svg', 'pwa-512x512.svg', 'favicon.ico'],
+      // Các tài nguyên tĩnh luôn được ưu tiên cache
+      includeAssets: ['favicon.ico', 'pwa-192x192.svg', 'pwa-512x512.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Visual Memoir AI',
         short_name: 'MemoirAI',
         description: 'Ghi chép kỷ niệm bằng hình ảnh và AI',
         theme_color: '#6366f1',
+        background_color: '#ffffff',
+        display: 'standalone',
         icons: [
           {
             src: '/pwa-192x192.svg',
@@ -27,19 +30,18 @@ export default defineConfig({
           }
         ]
       },
-      // --- PHẦN CẦN THÊM ĐỂ CHẠY OFFLINE ---
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'], // Cache tất cả tài nguyên build
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+
         runtimeCaching: [
           {
-            // Cache hình ảnh từ Cloudinary
-            urlPattern: ({ url }) => url.host === 'res.cloudinary.com',
-            handler: 'CacheFirst', // Ưu tiên lấy trong bộ nhớ máy
+            urlPattern: /^https:\/\/res\.cloudinary\.com\/.*/i,
+            handler: 'CacheFirst',
             options: {
               cacheName: 'cloudinary-images',
               expiration: {
-                maxEntries: 50, // Giữ tối đa 50 ảnh
-                maxAgeSeconds: 30 * 24 * 60 * 60 // Lưu trong 30 ngày
+                maxEntries: 100,
+                maxAgeSeconds: 30 * 24 * 60 * 60,
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -47,13 +49,18 @@ export default defineConfig({
             }
           },
           {
-            // Cache dữ liệu danh sách kỷ niệm từ Backend Render
-            urlPattern: ({ url }) => url.origin === 'https://backend-visual-memoir-pwa.onrender.com/api/diaries', // Thay bằng link thật của Tân
-            handler: 'StaleWhileRevalidate', // Lấy dữ liệu cũ hiện ra trước, sau đó cập nhật dữ liệu mới sau
+            urlPattern: ({ url }) => {
+              return url.origin === 'https://backend-visual-memoir-pwa.onrender.com' &&
+                url.pathname.startsWith('/api/diaries');
+            },
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'api-data-cache',
               expiration: {
                 maxEntries: 100
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
               }
             }
           }

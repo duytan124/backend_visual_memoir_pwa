@@ -43,11 +43,15 @@ export const useDiaryStore = defineStore('diary', {
             try {
                 const deviceId = this.getDeviceId();
                 const res = await axios.get(`${API_URL}/diaries`, {
-                    params: { deviceId }
+                    params: { deviceId },
+                    timeout: 5000 // Thêm timeout để không bắt người dùng chờ quá lâu khi mạng yếu
                 });
-                this.items = res.data;
+                if (res.data) {
+                    this.items = res.data;
+                }
             } catch (error) {
-                console.warn("⚠️ Đang chạy chế độ Offline hoặc lỗi server:", error.message);
+                // Không làm gì cả, 'this.items' sẽ tiếp tục sử dụng dữ liệu từ 'persist'
+                console.warn("⚠️ Chế độ Offline: Sử dụng dữ liệu lưu trữ cục bộ.");
             }
         },
 
