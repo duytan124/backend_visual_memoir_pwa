@@ -44,6 +44,17 @@ const diarySchema = new mongoose.Schema({
 diarySchema.index({ deviceId: 1, createdAt: -1 });
 const Diary = mongoose.model('Diary', diarySchema);
 
+
+const chatSchema = new mongoose.Schema({
+    deviceId: { type: String, required: true },
+    role: { type: String, enum: ['user', 'ai'], required: true },
+    text: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+
+chatSchema.index({ deviceId: 1, createdAt: 1 });
+const Chat = mongoose.model('Chat', chatSchema);
+
 // 4. LOGIC GEMINI AI (Giữ nguyên của Tân)
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -81,41 +92,52 @@ app.post('/api/analyze', async (req, res) => {
 app.post('/api/chat', async (req, res) => {
     try {
         const { message, deviceId } = req.body;
+        if (!message || !deviceId) return res.status(400).json({ error: "Thiếu dữ liệu" });
 
-        // 1. Lấy lịch sử nhật ký (nên lấy content và cả ngày tháng)
-        const history = await Diary.find({ deviceId })
+        // 1. Lưu tin nhắn của người dùng vào Database
+        const userMsg = new Chat({ deviceId, role: 'user', text: message });
+        await userMsg.save();
+
+        // 2. Lấy dữ liệu nhật ký để làm ngữ cảnh cho AI
+        const diaryHistory = await Diary.find({ deviceId })
             .sort({ createdAt: -1 })
             .limit(10);
 
-        const contextString = history.length > 0
-            ? history.map(d => `- [${d.createdAt.toLocaleDateString('vi-VN')}]: ${d.content}`).join('\n')
-            : "Người dùng chưa có kỷ niệm nào.";
+        const contextString = diaryHistory.length > 0
+            ? diaryHistory.map(d => `- [${d.createdAt.toLocaleDateString('vi-VN')}]: ${d.content}`).join('\n')
+            : "Chưa có kỷ niệm nào.";
 
-        // 2. Định nghĩa "tính cách" cho AI
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Đổi sang bản ổn định hơn
-
+        // 3. Gọi Gemini AI
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const systemPrompt = `
+Hôm nay là ${new Date().toLocaleString('vi-VN')}.
 Bạn là một người bạn thực tế, điềm đạm và tinh tế của tôi.
-PHONG CÁCH PHẢN HỒI:
-1. ĐI THẲNG VẤN ĐỀ: Không chào hỏi rườm rà, không cảm thán quá mức (ví dụ: "Ôi thật tuyệt", "Mình rất tiếc").
-2. PHÂN TÍCH & KHUYÊN: Dựa trên thông tin từ nhật ký và tin nhắn hiện tại, đưa ra nhận xét hoặc lời khuyên có giá trị thực tế.
-3. TIẾT CHẾ ĐẶT CÂU HỎI: Chỉ đặt câu hỏi nếu thực sự cần thêm thông tin để giải quyết vấn đề. Đừng đặt câu hỏi xã giao ở cuối mỗi câu.
-4. NGÔN NGỮ: Tiếng Việt tự nhiên, súc tích, xưng "mình" - "bạn". 
 
-NỘI DUNG TÂM SỰ: "${message}"
-        `;
+PHONG CÁCH PHẢN HỒI:
+1. ĐI THẲNG VẤN ĐỀ: Không chào hỏi rườm rà, không cảm thán quá mức.
+2. PHÂN TÍCH & KHUYÊN: Đưa ra nhận xét hoặc lời khuyên thực tế dựa trên nhật ký.
+3. TIẾT CHẾ ĐẶT CÂU HỎI: Không nhất thiết phải hỏi ngược lại.
+4. NGÔN NGỮ: Tiếng Việt tự nhiên, súc tích, xưng "mình" - "bạn".
+
+NỘI DUNG TÂM SỰ HIỆN TẠI: "${message}"`;
 
         const result = await model.generateContent(systemPrompt);
-        const responseText = result.response.text().trim();
+        const aiReply = result.response.text().trim();
 
-        res.json({ reply: responseText });
+        // 4. Lưu phản hồi của AI vào Database
+        const aiMsg = new Chat({ deviceId, role: 'ai', text: aiReply });
+        await aiMsg.save();
+
+        // 5. Trả về cho Frontend
+        res.json({ reply: aiReply });
+
     } catch (error) {
         console.error("Lỗi Chat AI:", error);
-        res.status(500).json({ reply: "Mình đang hơi 'lag' một tí, đợi mình tí nhé!" });
+        res.status(500).json({ error: "Mình đang hơi lag, thử lại sau nhé!" });
     }
 });
 
-//
+
 app.get('/api/diaries', async (req, res) => {
     try {
         const { deviceId } = req.query;
@@ -187,27 +209,6 @@ app.get('/api/chat/history', async (req, res) => {
     }
 });
 
-app.post('/api/chat', async (req, res) => {
-    try {
-        const { message, deviceId } = req.body;
-
-        // 1. Lưu tin nhắn của người dùng
-        const userMsg = new Chat({ deviceId, role: 'user', text: message });
-        await userMsg.save();
-
-        // (Giữ nguyên logic lấy Diary history và gọi Gemini ở đây...)
-        // const result = await model.generateContent(systemPrompt);
-        const aiReply = result.response.text().trim();
-
-        // 2. Lưu tin nhắn của AI
-        const aiMsg = new Chat({ deviceId, role: 'ai', text: aiReply });
-        await aiMsg.save();
-
-        res.json({ reply: aiReply });
-    } catch (error) {
-        res.status(500).json({ error: "Lỗi" });
-    }
-});
 
 // 6. GIỮ SERVER LUÔN "THỨC" TRÊN RENDER.COM
 setInterval(() => {

@@ -54,10 +54,6 @@ const newMessage = ref('');
 const isTyping = ref(false);
 const messages = ref([]);
 
-const messages = ref([
-    { role: 'ai', text: 'Chào Tân, mình đã xem qua các kỷ niệm của bạn. Hôm nay bạn thấy thế nào?', time: new Date() }
-]);
-
 const scrollToBottom = async () => {
     await nextTick();
     if (scrollBox.value) {
