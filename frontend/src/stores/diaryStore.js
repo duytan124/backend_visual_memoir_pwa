@@ -106,6 +106,19 @@ export const useDiaryStore = defineStore('diary', {
             } catch (error) {
                 console.error("❌ Lỗi xóa nhật ký:", error);
             }
+        },
+
+        async sendMessage(message) {
+            try {
+                const res = await axios.post(`${API_URL}/chat`, {
+                    message,
+                    deviceId: this.getDeviceId()
+                });
+                return res.data.reply;
+            } catch (error) {
+                console.error("Lỗi chat:", error);
+                return "Mình vẫn đang lắng nghe đây, bạn nói tiếp đi...";
+            }
         }
     }
 });

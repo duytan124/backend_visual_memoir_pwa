@@ -7,19 +7,22 @@ import History from '../views/history.vue';
 const routes = [
     {
         path: '/',
-        component: Home // Đổi từ home -> Home (khớp với tên đã import ở trên)
+        component: Home
     },
     {
         path: '/history',
-        component: History // Đổi từ history -> History
+        component: History
     },
     {
         path: '/detail/:id',
         name: 'Detail',
-        // Lưu ý đường dẫn: nếu file router nằm trong src/router/ 
-        // thì phải dùng ../views/ để lùi ra ngoài rồi mới vào views
         component: () => import('../views/detail.vue'),
         props: true
+    },
+    {
+        path: '/chat',
+        name: 'Chat',
+        component: () => import('../views/chatView.vue')
     }
 ];
 

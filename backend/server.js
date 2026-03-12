@@ -77,6 +77,47 @@ app.post('/api/analyze', async (req, res) => {
 
 });
 
+
+app.post('/api/chat', async (req, res) => {
+    try {
+        const { message, deviceId } = req.body;
+
+        // 1. Lấy lịch sử nhật ký (nên lấy content và cả ngày tháng)
+        const history = await Diary.find({ deviceId })
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        const contextString = history.length > 0
+            ? history.map(d => `- [${d.createdAt.toLocaleDateString('vi-VN')}]: ${d.content}`).join('\n')
+            : "Người dùng chưa có kỷ niệm nào.";
+
+        // 2. Định nghĩa "tính cách" cho AI
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Đổi sang bản ổn định hơn
+
+        const systemPrompt = `
+Bạn là một người bạn thân tên là "Memoir-AI". 
+Phong cách trò chuyện: 
+- Ngôn ngữ: Tiếng Việt, dùng từ ngữ tự nhiên, đời thường (như "mình", "bạn", "nè", "thế", "đấy"). 
+- Tính cách: Ấm áp, biết lắng nghe, thấu cảm sâu sắc nhưng không sướt mướt.
+- Nhiệm vụ: Dựa vào lịch sử nhật ký dưới đây để trò chuyện. Nếu thấy bạn mình đang buồn thì an ủi, thấy đang vui thì chúc mừng.
+- Quy tắc vàng: Trả lời ngắn gọn (tối đa 3 câu). Luôn kết thúc bằng một câu hỏi quan tâm để duy trì cuộc trò chuyện.
+
+Dữ liệu nhật ký của Tân:
+${contextString}
+
+Người dùng đang tâm sự: "${message}"
+        `;
+
+        const result = await model.generateContent(systemPrompt);
+        const responseText = result.response.text().trim();
+
+        res.json({ reply: responseText });
+    } catch (error) {
+        console.error("Lỗi Chat AI:", error);
+        res.status(500).json({ reply: "Mình đang hơi 'lag' một tí, đợi mình tí nhé Tân!" });
+    }
+});
+
 // 5. ROUTES API cho Diary
 app.get('/api/diaries', async (req, res) => {
     try {
