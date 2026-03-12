@@ -52,6 +52,7 @@ const store = useDiaryStore();
 const scrollBox = ref(null);
 const newMessage = ref('');
 const isTyping = ref(false);
+const messages = ref([]);
 
 const messages = ref([
     { role: 'ai', text: 'Chào Tân, mình đã xem qua các kỷ niệm của bạn. Hôm nay bạn thấy thế nào?', time: new Date() }
@@ -94,7 +95,23 @@ const adjustTextarea = (e) => {
     e.target.style.height = (e.target.scrollHeight) + 'px';
 };
 
-onMounted(() => {
+onMounted(async () => {
+    // Load lịch sử từ DB
+    const history = await store.fetchChatHistory();
+    if (history.length > 0) {
+        messages.value = history.map(m => ({
+            role: m.role,
+            text: m.text,
+            time: m.createdAt
+        }));
+    } else {
+        // Nếu chưa có gì thì hiện câu chào mặc định
+        messages.value.push({
+            role: 'ai',
+            text: 'Chào Tân, mình đã sẵn sàng lắng nghe bạn.',
+            time: new Date()
+        });
+    }
     scrollToBottom();
 });
 </script>

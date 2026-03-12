@@ -119,6 +119,18 @@ export const useDiaryStore = defineStore('diary', {
                 console.error("Lỗi chat:", error);
                 return "Mình vẫn đang lắng nghe đây, bạn nói tiếp đi...";
             }
+        },
+
+        async fetchChatHistory() {
+            try {
+                const res = await axios.get(`${API_URL}/chat/history`, {
+                    params: { deviceId: this.getDeviceId() }
+                });
+                return res.data; // Trả về mảng các tin nhắn [{role, text, createdAt}, ...]
+            } catch (error) {
+                console.error("Lỗi lấy lịch sử chat", error);
+                return [];
+            }
         }
     }
 });
