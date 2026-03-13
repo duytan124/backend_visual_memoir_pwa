@@ -108,16 +108,21 @@ export const useDiaryStore = defineStore('diary', {
             }
         },
 
-        async sendMessage(message) {
+        async updateEntry(id, { content, userContext }) {
             try {
-                const res = await axios.post(`${API_URL}/chat`, {
-                    message,
-                    deviceId: this.getDeviceId()
+                const res = await axios.put(`${API_URL}/diaries/${id}`, {
+                    content,
+                    userContext
                 });
-                return res.data.reply;
+                const index = this.items.findIndex(item => item._id === id);
+
+                if (index !== -1) {
+                    this.items[index] = res.data;
+                    return res.data;
+                }
             } catch (error) {
-                console.error("Lỗi chat:", error);
-                return "Mình vẫn đang lắng nghe đây, bạn nói tiếp đi...";
+                console.error("❌ Lỗi cập nhật nhật ký:", error.message);
+                throw error;
             }
         },
 

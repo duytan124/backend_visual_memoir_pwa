@@ -8,10 +8,6 @@
       <span class="icon">📜</span>
       <span>Lịch sử</span>
     </router-link>
-    <router-link to="/chat" class="nav-item" active-class="active">
-      <span class="icon">💬</span>
-      <span>Tâm sự</span>
-    </router-link>
   </nav>
 </template>
 

@@ -44,21 +44,10 @@ const diarySchema = new mongoose.Schema({
 diarySchema.index({ deviceId: 1, createdAt: -1 });
 const Diary = mongoose.model('Diary', diarySchema);
 
-
-const chatSchema = new mongoose.Schema({
-    deviceId: { type: String, required: true },
-    role: { type: String, enum: ['user', 'ai'], required: true },
-    text: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
-});
-
-chatSchema.index({ deviceId: 1, createdAt: 1 });
-const Chat = mongoose.model('Chat', chatSchema);
-
 // 4. LOGIC GEMINI AI (Giữ nguyên của Tân)
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
+// Route tạo mới nhật kí
 app.post('/api/analyze', async (req, res) => {
 
     try {
@@ -88,56 +77,7 @@ app.post('/api/analyze', async (req, res) => {
 
 });
 
-
-app.post('/api/chat', async (req, res) => {
-    try {
-        const { message, deviceId } = req.body;
-        if (!message || !deviceId) return res.status(400).json({ error: "Thiếu dữ liệu" });
-
-        // 1. Lưu tin nhắn của người dùng vào Database
-        const userMsg = new Chat({ deviceId, role: 'user', text: message });
-        await userMsg.save();
-
-        // 2. Lấy dữ liệu nhật ký để làm ngữ cảnh cho AI
-        const diaryHistory = await Diary.find({ deviceId })
-            .sort({ createdAt: -1 })
-            .limit(10);
-
-        const contextString = diaryHistory.length > 0
-            ? diaryHistory.map(d => `- [${d.createdAt.toLocaleDateString('vi-VN')}]: ${d.content}`).join('\n')
-            : "Chưa có kỷ niệm nào.";
-
-        // 3. Gọi Gemini AI
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const systemPrompt = `
-Hôm nay là ${new Date().toLocaleString('vi-VN')}.
-Bạn là một người bạn thực tế, điềm đạm và tinh tế của tôi.
-
-PHONG CÁCH PHẢN HỒI:
-1. ĐI THẲNG VẤN ĐỀ: Không chào hỏi rườm rà, không cảm thán quá mức.
-2. PHÂN TÍCH & KHUYÊN: Đưa ra nhận xét hoặc lời khuyên thực tế dựa trên nhật ký.
-3. TIẾT CHẾ ĐẶT CÂU HỎI: Không nhất thiết phải hỏi ngược lại.
-4. NGÔN NGỮ: Tiếng Việt tự nhiên, súc tích, xưng "mình" - "bạn".
-
-NỘI DUNG TÂM SỰ HIỆN TẠI: "${message}"`;
-
-        const result = await model.generateContent(systemPrompt);
-        const aiReply = result.response.text().trim();
-
-        // 4. Lưu phản hồi của AI vào Database
-        const aiMsg = new Chat({ deviceId, role: 'ai', text: aiReply });
-        await aiMsg.save();
-
-        // 5. Trả về cho Frontend
-        res.json({ reply: aiReply });
-
-    } catch (error) {
-        console.error("Lỗi Chat AI:", error);
-        res.status(500).json({ error: "Mình đang hơi lag, thử lại sau nhé!" });
-    }
-});
-
-
+// Route lấy tất cả nhật kí
 app.get('/api/diaries', async (req, res) => {
     try {
         const { deviceId } = req.query;
@@ -199,16 +139,27 @@ app.delete('/api/diaries/:id', async (req, res) => {
     }
 });
 
-app.get('/api/chat/history', async (req, res) => {
+// Route cập nhật nội dung nhật ký
+app.put('/api/diaries/:id', async (req, res) => {
     try {
-        const { deviceId } = req.query;
-        const history = await Chat.find({ deviceId }).sort({ createdAt: 1 });
-        res.json(history);
+        const { content, userContext } = req.body;
+        const updatedDiary = await Diary.findByIdAndUpdate(
+            req.params.id,
+            {
+                content: content,
+                userContext: userContext
+            },
+            { new: true }
+        );
+        if (!updatedDiary) {
+            return res.status(404).json({ error: "Không tìm thấy kỷ niệm này" });
+        }
+        res.json(updatedDiary);
     } catch (error) {
-        res.status(500).json({ error: "Lỗi lấy lịch sử chat" });
+        console.error("Lỗi cập nhật:", error);
+        res.status(500).json({ error: "Lỗi hệ thống khi cập nhật" });
     }
 });
-
 
 // 6. GIỮ SERVER LUÔN "THỨC" TRÊN RENDER.COM
 setInterval(() => {
