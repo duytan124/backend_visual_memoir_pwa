@@ -124,18 +124,6 @@ export const useDiaryStore = defineStore('diary', {
                 console.error("❌ Lỗi cập nhật nhật ký:", error.message);
                 throw error;
             }
-        },
-
-        async fetchChatHistory() {
-            try {
-                const res = await axios.get(`${API_URL}/chat/history`, {
-                    params: { deviceId: this.getDeviceId() }
-                });
-                return res.data; // Trả về mảng các tin nhắn [{role, text, createdAt}, ...]
-            } catch (error) {
-                console.error("Lỗi lấy lịch sử chat", error);
-                return [];
-            }
         }
     }
 });
