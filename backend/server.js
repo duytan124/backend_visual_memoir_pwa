@@ -145,19 +145,12 @@ app.put('/api/diaries/:id', async (req, res) => {
         const { content, userContext } = req.body;
         const updatedDiary = await Diary.findByIdAndUpdate(
             req.params.id,
-            {
-                content: content,
-                userContext: userContext
-            },
+            { content, userContext },
             { new: true }
         );
-        if (!updatedDiary) {
-            return res.status(404).json({ error: "Không tìm thấy kỷ niệm này" });
-        }
         res.json(updatedDiary);
     } catch (error) {
-        console.error("Lỗi cập nhật:", error);
-        res.status(500).json({ error: "Lỗi hệ thống khi cập nhật" });
+        res.status(500).json({ error: "Lỗi cập nhật" });
     }
 });
 

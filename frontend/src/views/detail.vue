@@ -35,12 +35,14 @@ const formatDate = (d) => new Date(d).toLocaleDateString('vi-VN', {
 });
 
 const handleEdit = async () => {
-    // Prompt của trình duyệt hoạt động hoàn hảo trên PWA mobile
     const newContent = window.prompt("Chỉnh sửa lời nhật ký:", item.value.content);
     if (newContent !== null && newContent.trim() !== "") {
         try {
-            await store.updateDiary(item.value._id, newContent);
-            alert("✨ Đã cập nhật lời văn!");
+            await store.updateDiary(item.value._id, {
+                content: newContent.trim(),
+                userContext: item.value.userContext
+            });
+            alert("✨ Đã cập nhật nội dung nhật ký");
         } catch (err) {
             alert("Lỗi khi cập nhật: " + err.message);
         }

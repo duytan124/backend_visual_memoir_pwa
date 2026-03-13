@@ -108,20 +108,16 @@ export const useDiaryStore = defineStore('diary', {
             }
         },
 
-        async updatedDiary(id, { content, userContext }) {
+        async updateDiary(id, updatedData) {
             try {
-                const res = await axios.put(`${API_URL}/diaries/${id}`, {
-                    content,
-                    userContext
-                });
-                const index = this.items.findIndex(item => item._id === id);
-
+                const res = await axios.put(`${API_URL}/diaries/${id}`, updatedData);
+                const index = this.items.findIndex(i => i._id === id);
                 if (index !== -1) {
                     this.items[index] = res.data;
-                    return res.data;
                 }
+                return res.data;
             } catch (error) {
-                console.error("❌ Lỗi cập nhật nhật ký:", error.message);
+                console.error("Lỗi Store:", error);
                 throw error;
             }
         }
