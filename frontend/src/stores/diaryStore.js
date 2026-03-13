@@ -108,7 +108,7 @@ export const useDiaryStore = defineStore('diary', {
             }
         },
 
-        async updateEntry(id, { content, userContext }) {
+        async updatedDiary(id, { content, userContext }) {
             try {
                 const res = await axios.put(`${API_URL}/diaries/${id}`, {
                     content,
