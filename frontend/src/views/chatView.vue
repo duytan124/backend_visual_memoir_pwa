@@ -11,15 +11,23 @@
         </header>
 
         <div class="messages-area" ref="scrollBox">
-            <div v-for="(msg, index) in messages" :key="index"
-                :class="['message-row', msg.role === 'user' ? 'user-row' : 'ai-row']">
-
-                <div v-if="msg.role === 'ai'" class="ai-avatar">🤖</div>
-
-                <div class="bubble">
-                    {{ msg.text }}
-                    <span class="time">{{ formatTime(msg.time) }}</span>
+            <template v-for="(msg, index) in messages" :key="index">
+                <div v-if="shouldShowDate(msg, index)" class="date-divider">
+                    <span>{{ formatDateLabel(msg.time) }}</span>
                 </div>
+
+                <div :class="['message-row', msg.role === 'user' ? 'user-row' : 'ai-row']">
+                    <div v-if="msg.role === 'ai'" class="ai-avatar">🤖</div>
+                    <div class="bubble">
+                        {{ msg.text }}
+                        <span class="time">{{ formatTime(msg.time) }}</span>
+                    </div>
+                </div>
+            </template>
+
+            <div v-if="messages.length === 0 && !isTyping" class="empty-state">
+                <i class="fa-solid fa-comment-dots"></i>
+                <p>Bắt đầu tâm sự với AI về ngày hôm nay của bạn...</p>
             </div>
 
             <div v-if="isTyping" class="message-row ai-row">
@@ -34,7 +42,7 @@
 
         <footer class="input-area">
             <div class="input-wrapper">
-                <textarea v-model="newMessage" placeholder="Tâm sự với AI..." rows="1" @input="adjustTextarea"
+                <textarea v-model="newMessage" placeholder="Viết tin nhắn..." rows="1" @input="adjustTextarea"
                     @keyup.enter.prevent="sendMessage"></textarea>
                 <button @click="sendMessage" :disabled="!newMessage.trim()" class="btn-send">
                     <i class="fa-solid fa-paper-plane"></i>
@@ -54,10 +62,35 @@ const newMessage = ref('');
 const isTyping = ref(false);
 const messages = ref([]);
 
+// --- LOGIC HIỂN THỊ THỜI GIAN ---
+const shouldShowDate = (msg, index) => {
+    if (index === 0) return true;
+    const prevMsg = messages.value[index - 1];
+    return new Date(msg.time).toDateString() !== new Date(prevMsg.time).toDateString();
+};
+
+const formatDateLabel = (date) => {
+    const d = new Date(date);
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) return 'Hôm nay';
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return 'Hôm qua';
+    return d.toLocaleDateString('vi-VN');
+};
+
+const formatTime = (date) => {
+    return new Date(date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
+
+// --- LOGIC CHÍNH ---
 const scrollToBottom = async () => {
     await nextTick();
     if (scrollBox.value) {
-        scrollBox.value.scrollTop = scrollBox.value.scrollHeight;
+        scrollBox.value.scrollTo({
+            top: scrollBox.value.scrollHeight,
+            behavior: 'smooth'
+        });
     }
 };
 
@@ -65,25 +98,22 @@ const sendMessage = async () => {
     if (!newMessage.value.trim()) return;
 
     const userText = newMessage.value;
-    messages.value.push({ role: 'user', text: userText, time: new Date() });
+    const tempTime = new Date();
+
+    messages.value.push({ role: 'user', text: userText, time: tempTime });
     newMessage.value = '';
     await scrollToBottom();
 
-    // Gọi AI
     isTyping.value = true;
     try {
         const aiReply = await store.sendMessage(userText);
         messages.value.push({ role: 'ai', text: aiReply, time: new Date() });
     } catch (error) {
-        messages.value.push({ role: 'ai', text: 'Xin lỗi Tân, mình gặp chút trục trặc kết nối.', time: new Date() });
+        messages.value.push({ role: 'ai', text: 'Mình gặp chút lỗi kết nối.', time: new Date() });
     } finally {
         isTyping.value = false;
         await scrollToBottom();
     }
-};
-
-const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 };
 
 const adjustTextarea = (e) => {
@@ -92,21 +122,13 @@ const adjustTextarea = (e) => {
 };
 
 onMounted(async () => {
-    // Load lịch sử từ DB
     const history = await store.fetchChatHistory();
-    if (history.length > 0) {
+    if (history && history.length > 0) {
         messages.value = history.map(m => ({
             role: m.role,
             text: m.text,
             time: m.createdAt
         }));
-    } else {
-        // Nếu chưa có gì thì hiện câu chào mặc định
-        messages.value.push({
-            role: 'ai',
-            text: 'Chào Tân, mình đã sẵn sàng lắng nghe bạn.',
-            time: new Date()
-        });
     }
     scrollToBottom();
 });
@@ -117,45 +139,63 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: #f1f5f9;
+    height: -webkit-fill-available;
+    /* Fix chiều cao cho trình duyệt di động */
+    background: #f8fafc;
 }
 
-/* Header */
 .chat-header {
-    padding: 15px;
-    background: white;
+    padding: 12px 16px;
+    background: #ffffff;
     display: flex;
     align-items: center;
     gap: 15px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    z-index: 10;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
 }
 
 .header-info h3 {
-    font-size: 1.1rem;
+    font-size: 1rem;
     margin: 0;
-    color: #1e293b;
+    font-weight: 600;
 }
 
 .header-info .status {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #10b981;
 }
 
-/* Messages Area */
 .messages-area {
     flex: 1;
     overflow-y: auto;
-    padding: 20px 15px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
+    -webkit-overflow-scrolling: touch;
+    /* Cuộn mượt trên iOS */
+}
+
+/* Date Divider */
+.date-divider {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+}
+
+.date-divider span {
+    background: #e2e8f0;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.65rem;
+    color: #64748b;
+    font-weight: 500;
 }
 
 .message-row {
     display: flex;
-    gap: 10px;
-    max-width: 85%;
+    gap: 8px;
+    max-width: 88%;
 }
 
 .user-row {
@@ -168,22 +208,22 @@ onMounted(async () => {
 }
 
 .ai-avatar {
-    width: 35px;
-    height: 35px;
+    width: 32px;
+    height: 32px;
     background: #6366f1;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1rem;
+    flex-shrink: 0;
 }
 
 .bubble {
-    padding: 12px 16px;
+    padding: 10px 14px;
     border-radius: 18px;
     font-size: 0.95rem;
-    line-height: 1.4;
-    position: relative;
+    line-height: 1.5;
 }
 
 .user-row .bubble {
@@ -194,33 +234,31 @@ onMounted(async () => {
 
 .ai-row .bubble {
     background: white;
-    color: #1e293b;
+    border: 1px solid #e2e8f0;
     border-bottom-left-radius: 4px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
 }
 
 .time {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
+    margin-top: 4px;
+    opacity: 0.6;
     display: block;
-    margin-top: 5px;
-    opacity: 0.7;
     text-align: right;
 }
 
 /* Input Area */
 .input-area {
     background: white;
-    padding: 10px 15px 30px;
-    /* Padding bottom sâu cho iPhone Safe Area */
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid #e2e8f0;
 }
 
 .input-wrapper {
-    background: #f8fafc;
-    border-radius: 25px;
+    background: #f1f5f9;
+    border-radius: 24px;
     display: flex;
     align-items: flex-end;
-    padding: 5px 15px;
-    border: 1px solid #e2e8f0;
+    padding: 4px 6px 4px 14px;
 }
 
 textarea {
@@ -228,13 +266,9 @@ textarea {
     border: none;
     background: transparent;
     padding: 10px 0;
-    max-height: 120px;
-    resize: none;
-    font-family: inherit;
+    max-height: 100px;
     font-size: 1rem;
-}
-
-textarea:focus {
+    resize: none;
     outline: none;
 }
 
@@ -242,28 +276,36 @@ textarea:focus {
     background: #6366f1;
     color: white;
     border: none;
-    width: 35px;
-    height: 35px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    margin-bottom: 5px;
-    margin-left: 10px;
-    transition: 0.2s;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.btn-send:disabled {
-    background: #cbd5e1;
+.empty-state {
+    text-align: center;
+    margin-top: 40px;
+    color: #94a3b8;
+}
+
+.empty-state i {
+    font-size: 2rem;
+    margin-bottom: 10px;
 }
 
 /* Typing Animation */
 .typing-bubble {
     display: flex;
     gap: 4px;
-    padding: 15px !important;
+    padding: 14px !important;
 }
 
 .dot {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     background: #94a3b8;
     border-radius: 50%;
     animation: blink 1.4s infinite;
@@ -282,12 +324,10 @@ textarea:focus {
     0%,
     100% {
         opacity: 0.3;
-        transform: scale(1);
     }
 
     50% {
         opacity: 1;
-        transform: scale(1.2);
     }
 }
 </style>
