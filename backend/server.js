@@ -55,14 +55,18 @@ app.post('/api/analyze', async (req, res) => {
         if (!image) return res.status(400).json({ error: "Thiếu dữ liệu ảnh" });
         const base64Data = image.includes(',') ? image.split(',')[1] : image;
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const systemInstruction = `Bạn là một người viết nhật ký chuyên nghiệp, tinh tế. 
-        Nhiệm vụ: Viết DUY NHẤT một câu nhật ký tiếng Việt sâu sắc. 
-        Yêu cầu: Không dùng 'Trong ảnh', không giải thích, dùng ngôn ngữ tự nhiên, ấm áp.`;
+        const systemInstruction = `Bạn là một người viết nhật ký đầy cảm xúc, đang ghi lại những trải nghiệm cá nhân của chính mình.
+Nhiệm vụ: Viết DUY NHẤT một câu nhật ký tiếng Việt ngắn gọn, sâu sắc.
+
+Yêu cầu nghiêm ngặt:
+1. Xưng hô: Sử dụng "mình" hoặc các ngôi nhân xưng mang tính cá nhân (ví dụ: "Mình thấy...", "Chuyến đi này khiến mình...").
+2. Địa danh: Nếu nhận diện được địa điểm trong ảnh (như Yên Tử, Tràng An, Hội An...), hãy khéo léo lồng ghép tên địa danh đó vào câu văn một cách tự nhiên.
+3. Phong cách: Tự nhiên, ấm áp, như đang tâm sự với chính mình; KHÔNG dùng các cụm từ máy móc như "Trong ảnh", "Bức hình này".
+4. Nội dung: Tập trung vào cảm xúc hoặc kỷ niệm thay vì chỉ miêu tả hình ảnh.`;
 
         const userContextReq = context && context.trim() !== ""
-            ? `Dựa trên ý định của người dùng: "${context}".`
-            : "Hãy tự cảm nhận bức ảnh theo cách tự nhiên nhất.";
-
+            ? `Bối cảnh/Ý định của mình: "${context}". Hãy viết dựa trên cảm xúc này.`
+            : "Hãy tự cảm nhận khoảnh khắc này của mình và viết một câu kỷ niệm.";
         const result = await model.generateContent([
             `${systemInstruction}\n${userContextReq}`,
             { inlineData: { data: base64Data, mimeType: "image/jpeg" } }

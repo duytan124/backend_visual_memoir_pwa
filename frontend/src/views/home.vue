@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { useDiaryStore } from '../stores/diaryStore';
 
 const store = useDiaryStore();
@@ -8,7 +8,7 @@ const selectedFileBase64 = ref(null);
 const userContext = ref('');
 const fileInput = ref(null);
 
-// --- HÀM NÉN ẢNH (GIẢM ĐỘ TRỄ) ---
+// --- 1. XỬ LÝ ẢNH ---
 const compressImage = (file) => {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -18,22 +18,17 @@ const compressImage = (file) => {
             img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                // Giới hạn chiều rộng tối đa 1024px để giữ chất lượng vừa đủ
                 const MAX_WIDTH = 1024;
                 let width = img.width;
                 let height = img.height;
-
                 if (width > MAX_WIDTH) {
                     height *= MAX_WIDTH / width;
                     width = MAX_WIDTH;
                 }
-
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-
-                // Nén thành định dạng JPEG với chất lượng 0.7 (70%)
                 const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
                 resolve(compressedBase64);
             };
@@ -41,71 +36,103 @@ const compressImage = (file) => {
     });
 };
 
-const triggerFileInput = () => {
-    fileInput.value.click();
-};
+const triggerFileInput = () => fileInput.value.click();
 
 const handleFileChange = async (event) => {
     const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-        alert("Vui lòng chọn một file ảnh nhé!");
-        return;
-    }
-
+    if (!file || !file.type.startsWith('image/')) return;
     try {
-        // Thực hiện nén ảnh ngay khi chọn
         const compressedBase64 = await compressImage(file);
-
         previewUrl.value = compressedBase64;
-        // Lưu chuỗi base64 đã nén (tách header) để gửi API
         selectedFileBase64.value = compressedBase64.split(',')[1];
-    } catch (error) {
-        console.error("Lỗi nén ảnh:", error);
-        alert("Không thể xử lý ảnh này, vui lòng thử ảnh khác.");
-    }
+    } catch (error) { console.error("Lỗi nén ảnh:", error); }
 };
 
 const createDiary = async () => {
-    if (!selectedFileBase64.value) {
-        alert("Vui lòng chọn hoặc chụp một bức ảnh trước nhé!");
-        return;
-    }
-
+    if (!selectedFileBase64.value) return alert("Chọn ảnh trước nhé!");
     try {
         store.isAnalyzing = true;
-
         const fullBase64 = `data:image/jpeg;base64,${selectedFileBase64.value}`;
-
-        // Gửi chuỗi đã nén lên AI và Database
         const aiContent = await store.analyzeImage(fullBase64, userContext.value);
-
-        if (!aiContent) {
-            throw new Error("Gemini không thể phản hồi vào lúc này.");
-        }
-
-        const result = await store.addEntry(
-            fullBase64,
-            aiContent,
-            userContext.value
-        );
-
+        const result = await store.addEntry(fullBase64, aiContent, userContext.value);
         if (result) {
-            alert("✨ Kỷ niệm tuyệt vời này đã được lưu lại!");
+            alert("✨ Đã lưu kỷ niệm!");
             previewUrl.value = null;
             selectedFileBase64.value = null;
             userContext.value = '';
-            if (fileInput.value) fileInput.value.value = '';
         }
+    } catch (error) { alert("Lỗi: " + error.message); }
+    finally { store.isAnalyzing = false; }
+};
 
-    } catch (error) {
-        console.error("❌ Lỗi quy trình:", error);
-        alert("Có lỗi xảy ra: " + (error.response?.data?.error || error.message));
-    } finally {
-        store.isAnalyzing = false;
+// --- 2. XỬ LÝ GIỌNG NÓI & ÂM LƯỢNG ---
+const isRecording = ref(false);
+const volumeLevel = ref(0);
+let recognition = null;
+let audioContext = null;
+let analyser = null;
+let microphone = null;
+let javascriptNode = null;
+
+const initSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ voice!");
+    recognition = new SpeechRecognition();
+    recognition.lang = 'vi-VN';
+    recognition.onstart = () => isRecording.value = true;
+    recognition.onend = () => isRecording.value = false;
+    recognition.onresult = (e) => {
+        const transcript = e.results[0][0].transcript;
+        userContext.value += (userContext.value ? ' ' : '') + transcript;
+    };
+};
+
+const startVolumeMeter = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+        analyser.fftSize = 256;
+        microphone.connect(analyser);
+        analyser.connect(javascriptNode);
+        javascriptNode.connect(audioContext.destination);
+
+        javascriptNode.onaudioprocess = () => {
+        const array = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(array);
+        const average = array.reduce((a, b) => a + b) / array.length;
+        if (average < 12) {
+            volumeLevel.value = 0;
+        } else {
+            volumeLevel.value = Math.min(Math.round(average * 1.8), 100);
+        }
+    };
+    } catch (err) { console.error("Mic error:", err); }
+};
+
+const stopVolumeMeter = () => {
+    if (audioContext) audioContext.close();
+    if (javascriptNode) javascriptNode.disconnect();
+};
+
+const toggleVoiceInput = () => {
+    if (isRecording.value) {
+        recognition?.stop();
+        stopVolumeMeter();
+        volumeLevel.value = 0;
+    } else {
+        if (!recognition) initSpeechRecognition();
+        recognition?.start();
+        startVolumeMeter();
     }
 };
+
+onUnmounted(() => {
+    recognition?.stop();
+    stopVolumeMeter();
+});
 </script>
 
 <template>
@@ -130,8 +157,14 @@ const createDiary = async () => {
             <Transition name="slide">
                 <div v-if="previewUrl" class="context-box">
                     <label>Bạn đang cảm thấy thế nào?</label>
-                    <textarea v-model="userContext"
-                        placeholder="Ví dụ: Hôm nay mình đi biển với gia đình..."></textarea>
+                    <div class="input-wrapper">
+                        <textarea v-model="userContext"
+                            placeholder="Ví dụ: Hôm nay mình đi biển với gia đình..."></textarea>
+                        <button @click="toggleVoiceInput" class="mic-btn" :class="{ 'is-recording': isRecording }"
+                            :style="{ '--volume': `${volumeLevel}px` }">
+                            <img src="../../public/mic.png" alt="Mic" />
+                        </button>
+                    </div>
                 </div>
             </Transition>
 
@@ -398,5 +431,67 @@ h1 {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.mic-btn {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    transition: all 0.1s linear;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mic-btn img {
+    width: 24px;
+    height: 24px;
+    opacity: 0.3;
+    filter: grayscale(100%);
+    transition: all 0.2s ease;
+}
+
+.mic-btn.is-recording {
+    background-color: rgba(34, 211, 238, 0.1);
+}
+
+.mic-btn.is-recording img {
+    opacity: 1;
+    filter: grayscale(0%);
+    filter: drop-shadow(0 0 calc(var(--volume) / 4) rgba(34, 211, 238, 0.8));
+    transform: scale(calc(1 + var(--volume) / 500));
+}
+
+.mic-btn.is-recording::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 calc(var(--volume) * 1.2) rgba(34, 211, 238, 0.5);
+    transition: box-shadow 0.05s linear;
+    pointer-events: none;
+}
+
+.mic-btn.is-recording::after {
+    display: none;
+}
+
+.context-box textarea {
+    padding-right: 60px !important;
 }
 </style>
