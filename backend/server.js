@@ -49,24 +49,29 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Route tạo mới nhật kí
 app.post('/api/analyze', async (req, res) => {
-
     try {
         const { image, context } = req.body;
         if (!image) return res.status(400).json({ error: "Thiếu dữ liệu ảnh" });
+
         const base64Data = image.includes(',') ? image.split(',')[1] : image;
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+        // --- PROMPT ĐƯỢC NÂNG CẤP ---
         const systemInstruction = `Bạn là một người viết nhật ký đầy cảm xúc, đang ghi lại những trải nghiệm cá nhân của chính mình.
-Nhiệm vụ: Viết DUY NHẤT một câu nhật ký tiếng Việt ngắn gọn, sâu sắc.
+Nhiệm vụ: Viết DUY NHẤT một câu hoặc một đoạn nhật ký tiếng Việt ngắn gọn (khoảng 15-30 từ), sâu sắc.
 
 Yêu cầu nghiêm ngặt:
-1. Xưng hô: Sử dụng "mình" hoặc các ngôi nhân xưng mang tính cá nhân (ví dụ: "Mình thấy...", "Chuyến đi này khiến mình...").
-2. Địa danh: Nếu nhận diện được địa điểm trong ảnh (như Yên Tử, Tràng An, Hội An...), hãy khéo léo lồng ghép tên địa danh đó vào câu văn một cách tự nhiên.
-3. Phong cách: Tự nhiên, ấm áp, như đang tâm sự với chính mình; KHÔNG dùng các cụm từ máy móc như "Trong ảnh", "Bức hình này".
-4. Nội dung: Tập trung vào cảm xúc hoặc kỷ niệm thay vì chỉ miêu tả hình ảnh.`;
+1. Xưng hô: Sử dụng "mình" hoặc các ngôi nhân xưng mang tính cá nhân (ví dụ: "Mình thấy...", "Chuyến đi này...").
+2. Địa danh & Không gian: Quan sát kỹ các chi tiết (kiến trúc, phong cảnh, thời tiết, biển báo). Nếu nhận diện được địa điểm, hãy lồng ghép khéo léo vào câu văn. Nếu không rõ địa điểm, hãy miêu tả không khí lúc đó.
+3. Phong cách: Tự nhiên, ấm áp, như đang tâm sự; TUYỆT ĐỐI KHÔNG dùng các từ máy móc như "Trong ảnh", "Bức hình này", "Có thể thấy".
+4. Đồng điệu: Tập trung vào cảm xúc và phải "bắt đúng tần số" tâm trạng mà mình cung cấp.
+5. Trang trí: Thêm 1-2 emoji thật phù hợp ở cuối câu để lưu giữ trọn vẹn cảm xúc.`;
 
+        // Nâng cấp cách xử lý Context để AI nhạy cảm hơn khi người dùng im lặng
         const userContextReq = context && context.trim() !== ""
-            ? `Bối cảnh/Ý định của mình: "${context}". Hãy viết dựa trên cảm xúc này.`
-            : "Hãy tự cảm nhận khoảnh khắc này của mình và viết một câu kỷ niệm.";
+            ? `Bối cảnh/Tâm trạng của mình lúc này: "${context}". Hãy viết dựa trên đúng cảm xúc này.`
+            : `Mình không để lại lời nhắn nào. Hãy tự cảm nhận ánh sáng, màu sắc và không khí trong khoảnh khắc này để đoán xem mình đang vui vẻ, suy tư hay bình yên, và viết thay tiếng lòng của mình.`;
+
         const result = await model.generateContent([
             `${systemInstruction}\n${userContextReq}`,
             { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
@@ -78,7 +83,6 @@ Yêu cầu nghiêm ngặt:
         console.error("Lỗi Gemini:", error);
         res.status(500).json({ error: "AI đang bận, thử lại sau nhé!" });
     }
-
 });
 
 // Route lấy tất cả nhật kí
