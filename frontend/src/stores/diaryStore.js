@@ -48,13 +48,12 @@ export const useDiaryStore = defineStore('diary', {
                 const deviceId = this.getDeviceId();
                 const res = await axios.get(`${API_URL}/diaries`, {
                     params: { deviceId },
-                    timeout: 5000 // Thêm timeout để không bắt người dùng chờ quá lâu khi mạng yếu
+                    timeout: 5000
                 });
                 if (res.data) {
                     this.items = res.data;
                 }
             } catch (error) {
-                // Không làm gì cả, 'this.items' sẽ tiếp tục sử dụng dữ liệu từ 'persist'
                 console.warn("⚠️ Chế độ Offline: Sử dụng dữ liệu lưu trữ cục bộ.");
             }
         },
@@ -73,7 +72,7 @@ export const useDiaryStore = defineStore('diary', {
                 return res.data;
             } catch (error) {
                 console.error("❌ Lỗi lưu nhật ký:", error.message);
-                throw error; // Quăng lỗi để UI biết mà thông báo "Không thể lưu khi offline"
+                throw error;
             }
         },
 
@@ -118,6 +117,21 @@ export const useDiaryStore = defineStore('diary', {
                 return res.data;
             } catch (error) {
                 console.error("Lỗi Store:", error);
+                throw error;
+            }
+        },
+
+        async subscribePush(subscription) {
+            try {
+                const deviceId = this.getDeviceId();
+                await axios.post(`${API_URL}/subscribe`, {
+                    subscription: subscription,
+                    deviceId: deviceId,
+                });
+                this.isPushSubscribed = true;
+                return true;
+            } catch (error) {
+                console.error("❌ Lỗi đăng ký Push lên Server:", error);
                 throw error;
             }
         }

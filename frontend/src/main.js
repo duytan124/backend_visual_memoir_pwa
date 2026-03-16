@@ -29,3 +29,7 @@ registerSW({
 });
 
 app.mount('#app');
+
+if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+}

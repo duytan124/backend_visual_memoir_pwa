@@ -7,7 +7,7 @@ require('dotenv').config();
 // MỚI: Thêm các thư viện Cloudinary
 const cloudinary = require('cloudinary').v2;
 const app = express();
-const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com/api/diaries";
+const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com/";
 
 // 1. CẤU HÌNH CLOUDINARY
 cloudinary.config({
@@ -159,6 +159,79 @@ app.put('/api/diaries/:id', async (req, res) => {
         res.json(updatedDiary);
     } catch (error) {
         res.status(500).json({ error: "Lỗi cập nhật" });
+    }
+});
+
+const webpush = require('web-push');
+const cron = require('node-cron');
+
+// 1. Cấu hình Web Push
+webpush.setVapidDetails(
+    process.env.VAPID_MAIL,
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+);
+
+// 2. Tạo DB lưu "Địa chỉ" nhận thông báo của điện thoại
+const subscriptionSchema = new mongoose.Schema({
+    deviceId: String,
+    endpoint: String,
+    keys: mongoose.Schema.Types.Mixed,
+});
+const Subscription = mongoose.model('Subscription', subscriptionSchema);
+
+// 3. API để điện thoại gửi "Địa chỉ" lên Server
+app.post('/api/subscribe', async (req, res) => {
+    const { subscription, deviceId } = req.body;
+
+    // Xóa địa chỉ cũ nếu có, lưu địa chỉ mới
+    await Subscription.deleteMany({ deviceId });
+    await new Subscription({ ...subscription, deviceId }).save();
+
+    res.status(201).json({ message: "Đã đăng ký nhận thông báo ngầm!" });
+});
+
+// 4. Đặt báo thức chạy ngầm trên Server (Đúng 18:00 mỗi ngày)
+cron.schedule('* * * * *', async () => {
+    console.log("⏰ Bắt đầu kiểm tra nhắc nhở lúc 19:00...");
+
+    // Lấy 0h00 của ngày hôm nay theo giờ VN
+    const vnOffset = 7 * 60 * 60 * 1000;
+    const nowVN = new Date(new Date().getTime() + vnOffset);
+    const startOfTodayVN = new Date(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate());
+    const startOfTodayUTC = new Date(startOfTodayVN.getTime() - vnOffset);
+
+    // Lấy tất cả thiết bị đã đăng ký
+    const subs = await Subscription.find();
+
+    for (let sub of subs) {
+        // Kiểm tra xem thiết bị này hôm nay đã viết nhật ký chưa
+        const count = await Diary.countDocuments({
+            deviceId: sub.deviceId,
+            createdAt: { $gte: startOfTodayUTC }
+        });
+
+        if (count === 0) {
+            // Nếu chưa viết, bắn thông báo thẳng xuống điện thoại!
+            const payload = JSON.stringify({
+                title: "✨ Kỷ niệm đang chờ bạn",
+                body: "Hôm nay bạn chưa ghi lại gì cả, dành ít phút nhé! 📝",
+                url: "/"
+            });
+
+            try {
+                await webpush.sendNotification({
+                    endpoint: sub.endpoint,
+                    keys: sub.keys
+                }, payload);
+                console.log(`Đã gửi thông báo cho ${sub.deviceId}`);
+            } catch (error) {
+                console.error("Lỗi gửi push (có thể người dùng đã hủy quyền):", error);
+                if (error.statusCode === 410) {
+                    await Subscription.findByIdAndDelete(sub._id); // Xóa nếu thiết bị không còn hợp lệ
+                }
+            }
+        }
     }
 });
 
