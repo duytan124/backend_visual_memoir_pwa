@@ -1,18 +1,10 @@
 <script setup>
 import BottomNav from './components/bottomNav.vue';
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useDiaryStore } from './stores/diaryStore';
 
 const store = useDiaryStore();
-
 const isNotificationSupported = ref('Notification' in window && 'serviceWorker' in navigator);
-const notificationPermission = ref(isNotificationSupported.value ? Notification.permission : 'denied');
-
-const shouldShowNotifyBtn = computed(() => {
-  return isNotificationSupported.value &&
-    notificationPermission.value !== 'granted' &&
-    !store.isPushSubscribed;
-});
 
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -25,66 +17,48 @@ const urlBase64ToUint8Array = (base64String) => {
   return outputArray;
 };
 
-const enableNotifications = async () => {
+const setupPushNotifications = async () => {
   if (!isNotificationSupported.value) return;
 
   try {
+    // 1. Xin quyền từ trình duyệt
     const permission = await Notification.requestPermission();
-    notificationPermission.value = permission;
 
     if (permission === "granted") {
       const reg = await navigator.serviceWorker.ready;
-
-      // 🔑 QUAN TRỌNG: Thay bằng Public Key thật từ Backend của Tân
       const publicVapidKey = "BC8G3662sguTZk81YL7TO1zliLeNU423P8qBhf52e-A2b9_40RqASN_bi-Fkbfisc7Ad9GvqcPoVtovnND3MoTg";
 
+      // 2. Đăng ký Push Manager
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
       });
 
-      // Gọi action từ Store để lưu subscription lên Backend
+      // 3. Gửi lên server lưu trữ
       await store.subscribePush(subscription);
-
-      // Thông báo thành công cục bộ
-      await sendLocalNotification(
-        "✨ Đã bật nhắc nhở",
-        "Mình sẽ ghé thăm bạn vào lúc 16:00 mỗi ngày nhé! 📝"
-      );
+      console.log("✅ Đã tự động đăng ký thông báo.");
     }
   } catch (error) {
-    console.error("Lỗi đăng ký Push:", error);
-    alert("Có lỗi khi kết nối với máy chủ thông báo. Tân thử lại sau nhé!");
-  }
-};
-
-const sendLocalNotification = async (title, body) => {
-  const isGranted = notificationPermission.value === 'granted';
-  if ('serviceWorker' in navigator && isGranted) {
-    const reg = await navigator.serviceWorker.ready;
-    reg.showNotification(title, {
-      body,
-      icon: "/favicon.ico",
-      badge: "/favicon.ico",
-      vibrate: [200, 100, 200],
-      data: { url: window.location.origin }
-    });
+    console.warn("⚠️ Không thể tự động đăng ký (có thể do chính sách trình duyệt):", error);
   }
 };
 
 onMounted(() => {
-  if (notificationPermission.value === 'granted') {
-    console.log("🔔 Hệ thống thông báo đã sẵn sàng.");
+  if (isNotificationSupported.value) {
+    const shouldRegister = Notification.permission === 'default' ||
+      (Notification.permission === 'granted' && !store.isPushSubscribed);
+
+    if (shouldRegister) {
+      setTimeout(() => {
+        setupPushNotifications();
+      }, 2000); // Delay 2s để app ổn định rồi mới hiện popup
+    }
   }
 });
 </script>
 
 <template>
   <div class="app-shell">
-    <button v-if="shouldShowNotifyBtn" @click="enableNotifications" class="btn-notification">
-      🔔 Nhận lời nhắc 16:00
-    </button>
-
     <main class="content-area">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -92,7 +66,6 @@ onMounted(() => {
         </transition>
       </router-view>
     </main>
-
     <BottomNav />
   </div>
 </template>
@@ -102,7 +75,6 @@ onMounted(() => {
 
 :root {
   --primary: #6366f1;
-  --primary-dark: #4f46e5;
   --bg-main: #f8fafc;
 }
 
@@ -129,28 +101,6 @@ body {
 .content-area {
   flex: 1;
   padding-bottom: 90px;
-}
-
-.btn-notification {
-  position: fixed;
-  top: 15px;
-  right: 15px;
-  z-index: 1000;
-  padding: 10px 18px;
-  background: var(--primary);
-  color: white;
-  border-radius: 50px;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-notification:active {
-  transform: scale(0.95);
-  background: var(--primary-dark);
 }
 
 .fade-enter-active,

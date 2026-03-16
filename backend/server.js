@@ -164,6 +164,7 @@ app.put('/api/diaries/:id', async (req, res) => {
 
 const webpush = require('web-push');
 const cron = require('node-cron');
+const moment = require('moment-timezone');
 
 // 1. Cấu hình Web Push
 webpush.setVapidDetails(
@@ -191,8 +192,8 @@ app.post('/api/subscribe', async (req, res) => {
     res.status(201).json({ message: "Đã đăng ký nhận thông báo ngầm!" });
 });
 
-// 4. Đặt báo thức chạy ngầm trên Server (Đúng 18:00 mỗi ngày)
-cron.schedule('* * * * *', async () => {
+// 4. Đặt báo thức chạy ngầm trên Server (Đúng 19:00 mỗi ngày)
+cron.schedule('* 19 * * *', async () => {
     console.log("⏰ Bắt đầu kiểm tra nhắc nhở lúc 19:00...");
 
     // Lấy 0h00 của ngày hôm nay theo giờ VN
@@ -233,7 +234,11 @@ cron.schedule('* * * * *', async () => {
             }
         }
     }
-});
+},
+    {
+        scheduled: true,
+        timezone: "Asia/Ho_Chi_Minh"
+    });
 
 // 6. GIỮ SERVER LUÔN "THỨC" TRÊN RENDER.COM
 setInterval(() => {
