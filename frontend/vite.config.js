@@ -12,7 +12,7 @@ export default defineConfig({
 
       // 1. CẤU HÌNH WORKBOX ĐỂ KẾT HỢP CACHE & PUSH
       workbox: {
-        importScripts: ['./public/sw.js'],
+        importScripts: ['/push-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg}'],
         runtimeCaching: [
           {
