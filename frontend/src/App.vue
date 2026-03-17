@@ -19,27 +19,23 @@ const urlBase64ToUint8Array = (base64String) => {
 
 const setupPushNotifications = async () => {
   if (!isNotificationSupported.value) return;
-
+  
   try {
-    // 1. Xin quyền từ trình duyệt
     const permission = await Notification.requestPermission();
-
     if (permission === "granted") {
       const reg = await navigator.serviceWorker.ready;
       const publicVapidKey = "BC8G3662sguTZk81YL7TO1zliLeNU423P8qBhf52e-A2b9_40RqASN_bi-Fkbfisc7Ad9GvqcPoVtovnND3MoTg";
 
-      // 2. Đăng ký Push Manager
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
       });
 
-      // 3. Gửi lên server lưu trữ
       await store.subscribePush(subscription);
       console.log("✅ Đã tự động đăng ký thông báo.");
     }
   } catch (error) {
-    console.warn("⚠️ Không thể tự động đăng ký (có thể do chính sách trình duyệt):", error);
+    console.warn("⚠️ Không thể tự động đăng ký:", error);
   }
 };
 
@@ -49,9 +45,14 @@ onMounted(() => {
       (Notification.permission === 'granted' && !store.isPushSubscribed);
 
     if (shouldRegister) {
-      setTimeout(() => {
+      const triggerOnce = () => {
         setupPushNotifications();
-      }, 2000); // Delay 2s để app ổn định rồi mới hiện popup
+        window.removeEventListener('click', triggerOnce);
+        window.removeEventListener('touchstart', triggerOnce);
+      };
+
+      window.addEventListener('click', triggerOnce);
+      window.addEventListener('touchstart', triggerOnce);
     }
   }
 });

@@ -44,6 +44,16 @@ const diarySchema = new mongoose.Schema({
 diarySchema.index({ deviceId: 1, createdAt: -1 });
 const Diary = mongoose.model('Diary', diarySchema);
 
+const subscriptionSchema = new mongoose.Schema({
+    deviceId: { type: String, required: true },
+    endpoint: { type: String, required: true },
+    keys: mongoose.Schema.Types.Mixed,
+    createdAt: { type: Date, default: Date.now }
+});
+
+subscriptionSchema.index({ deviceId: 1 }, { unique: true });
+const Subscription = mongoose.model('Subscription', subscriptionSchema);
+
 // 4. LOGIC GEMINI AI (Giữ nguyên của Tân)
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -162,83 +172,75 @@ app.put('/api/diaries/:id', async (req, res) => {
     }
 });
 
+// server.js - Phần Notification
 const webpush = require('web-push');
 const cron = require('node-cron');
 const moment = require('moment-timezone');
 
-// 1. Cấu hình Web Push
+// Cấu hình VAPID
 webpush.setVapidDetails(
     process.env.VAPID_MAIL,
     process.env.VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
 );
 
-// 2. Tạo DB lưu "Địa chỉ" nhận thông báo của điện thoại
-const subscriptionSchema = new mongoose.Schema({
-    deviceId: String,
-    endpoint: String,
-    keys: mongoose.Schema.Types.Mixed,
-});
-const Subscription = mongoose.model('Subscription', subscriptionSchema);
-
-// 3. API để điện thoại gửi "Địa chỉ" lên Server
+// API nhận Subscription từ Frontend
 app.post('/api/subscribe', async (req, res) => {
-    const { subscription, deviceId } = req.body;
+    try {
+        const { subscription, deviceId } = req.body;
+        if (!subscription || !deviceId) return res.status(400).send("Thiếu dữ liệu");
 
-    // Xóa địa chỉ cũ nếu có, lưu địa chỉ mới
-    await Subscription.deleteMany({ deviceId });
-    await new Subscription({ ...subscription, deviceId }).save();
+        // Cập nhật hoặc thêm mới (upsert) để tránh trùng lặp
+        await Subscription.findOneAndUpdate(
+            { deviceId },
+            {
+                endpoint: subscription.endpoint,
+                keys: subscription.keys,
+                deviceId
+            },
+            { upsert: true, new: true }
+        );
 
-    res.status(201).json({ message: "Đã đăng ký nhận thông báo ngầm!" });
+        res.status(201).json({ message: "Đã lưu đăng ký thông báo!" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// 4. Đặt báo thức chạy ngầm trên Server (Đúng 19:00 mỗi ngày)
-cron.schedule('* 19 * * *', async () => {
-    console.log("⏰ Bắt đầu kiểm tra nhắc nhở lúc 19:00...");
-
-    // Lấy 0h00 của ngày hôm nay theo giờ VN
-    const vnOffset = 7 * 60 * 60 * 1000;
-    const nowVN = new Date(new Date().getTime() + vnOffset);
-    const startOfTodayVN = new Date(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate());
-    const startOfTodayUTC = new Date(startOfTodayVN.getTime() - vnOffset);
-
-    // Lấy tất cả thiết bị đã đăng ký
-    const subs = await Subscription.find();
-
-    for (let sub of subs) {
-        // Kiểm tra xem thiết bị này hôm nay đã viết nhật ký chưa
-        const count = await Diary.countDocuments({
-            deviceId: sub.deviceId,
-            createdAt: { $gte: startOfTodayUTC }
+cron.schedule('0 19 * * *', async () => {
+    console.log("⏰ [Cron] Đang quét nhắc nhở...");
+    try {
+        const todayVN = moment.tz("Asia/Ho_Chi_Minh").startOf('day').toDate();
+        const writtenDeviceIds = await Diary.distinct('deviceId', {
+            createdAt: { $gte: todayVN }
+        });
+        const pendingSubs = await Subscription.find({
+            deviceId: { $nin: writtenDeviceIds }
+        });
+        const payload = JSON.stringify({
+            title: "✨ Kỷ niệm đang chờ bạn",
+            body: "Hôm nay bạn chưa ghi lại khoảnh khắc nào, dành 1 phút nhé! 📝",
+            url: "/"
         });
 
-        if (count === 0) {
-            // Nếu chưa viết, bắn thông báo thẳng xuống điện thoại!
-            const payload = JSON.stringify({
-                title: "✨ Kỷ niệm đang chờ bạn",
-                body: "Hôm nay bạn chưa ghi lại gì cả, dành ít phút nhé! 📝",
-                url: "/"
-            });
-
-            try {
-                await webpush.sendNotification({
-                    endpoint: sub.endpoint,
-                    keys: sub.keys
-                }, payload);
-                console.log(`Đã gửi thông báo cho ${sub.deviceId}`);
-            } catch (error) {
-                console.error("Lỗi gửi push (có thể người dùng đã hủy quyền):", error);
-                if (error.statusCode === 410) {
-                    await Subscription.findByIdAndDelete(sub._id); // Xóa nếu thiết bị không còn hợp lệ
+        pendingSubs.forEach(sub => {
+            webpush.sendNotification({
+                endpoint: sub.endpoint,
+                keys: sub.keys
+            }, payload).catch(err => {
+                if (err.statusCode === 410) {
+                    Subscription.findByIdAndDelete(sub._id).exec();
                 }
-            }
-        }
+            });
+        });
+        console.log(`✅ Đã gửi cho ${pendingSubs.length} thiết bị.`);
+    } catch (err) {
+        console.error("Lỗi Cron:", err);
     }
-},
-    {
-        scheduled: true,
-        timezone: "Asia/Ho_Chi_Minh"
-    });
+}, {
+    scheduled: true,
+    timezone: "Asia/Ho_Chi_Minh"
+});
 
 // 6. GIỮ SERVER LUÔN "THỨC" TRÊN RENDER.COM
 setInterval(() => {

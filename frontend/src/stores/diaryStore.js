@@ -21,11 +21,13 @@ export const useDiaryStore = defineStore('diary', {
         deviceId: DEVICE_ID,
         isAnalyzing: false,
         currentTags: [],
+        isPushSubscribed: false
     }),
 
     persist: {
         key: 'visual-memoir-storage',
         storage: localStorage,
+        paths: ['items', 'isPushSubscribed']
     },
 
     actions: {
@@ -129,9 +131,11 @@ export const useDiaryStore = defineStore('diary', {
                     deviceId: deviceId,
                 });
                 this.isPushSubscribed = true;
+                console.log("✅ Đã lưu đăng ký Push thành công.");
                 return true;
             } catch (error) {
                 console.error("❌ Lỗi đăng ký Push lên Server:", error);
+                this.isPushSubscribed = false;
                 throw error;
             }
         }

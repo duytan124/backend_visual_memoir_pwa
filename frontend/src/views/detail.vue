@@ -8,19 +8,13 @@ const route = useRoute();
 const router = useRouter();
 const store = useDiaryStore();
 
-// Lấy item từ store dựa trên ID từ URL
 const item = computed(() => store.items.find(i => i._id === (props.id || route.params.id)));
 
-/**
- * XỬ LÝ ĐƯỜNG DẪN ẢNH CHO PWA
- */
 const convertPath = (path) => {
     if (!path) return '';
-    // Nếu là ảnh base64 hoặc link tuyệt đối thì dùng luôn
     if (path.startsWith('data:image') || path.startsWith('http')) {
         return path;
     }
-    // Nếu là path tương đối từ server, nối với Base URL của Backend
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     return `${backendUrl}/${path}`;
 };

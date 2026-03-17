@@ -10,25 +10,20 @@ onMounted(async () => {
 
 const convertPath = (path) => store.getDisplayPath(path);
 
-// --- LOGIC CHIA SẺ NATIVE TRÊN ĐIỆN THOẠI ---
 const handleMobileShare = async (item) => {
     const shareData = {
         title: 'Kỷ niệm từ AI Diary 📸',
         text: item.content,
-        // Link này sẽ mở ra trang web của bạn trên điện thoại người nhận
         url: `${window.location.origin}/detail/${item._id}`
     };
 
-    // Kiểm tra xem trình duyệt di động có hỗ trợ Web Share API không
     if (navigator.share) {
         try {
-            // Mở khay chia sẻ hệ thống (Gồm Zalo, FB, Insta...)
             await navigator.share(shareData);
         } catch (err) {
             console.log('User cancelled share');
         }
     } else {
-        // Fallback: Copy link nếu mở bằng trình duyệt cũ hoặc máy tính
         await navigator.clipboard.writeText(shareData.url);
         alert("Đã sao chép liên kết! Bạn có thể dán vào Zalo/Facebook để chia sẻ.");
     }
@@ -94,7 +89,6 @@ const formatDate = (dateStr) => {
 </template>
 
 <style scoped>
-/* Layout chung tối ưu cho Mobile */
 .history-page {
     display: flex;
     flex-direction: column;
@@ -114,10 +108,8 @@ const formatDate = (dateStr) => {
     flex: 1;
     overflow-y: auto;
     padding: 0 15px 100px;
-    /* Chừa chỗ cho menu dưới */
 }
 
-/* Timeline design */
 .timeline-list {
     position: relative;
     padding-left: 10px;
@@ -171,7 +163,6 @@ const formatDate = (dateStr) => {
     color: #94a3b8;
 }
 
-/* Entry Card */
 .entry-card {
     flex: 1;
     background: white;
@@ -219,7 +210,6 @@ const formatDate = (dateStr) => {
     font-weight: 600;
 }
 
-/* Nút chia sẻ phong cách Mobile App */
 .btn-share-mobile {
     background: #eff6ff;
     border: none;
