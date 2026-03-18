@@ -219,17 +219,20 @@ cron.schedule('0 19 * * *', async () => {
         });
         const payload = JSON.stringify({
             title: "✨ Kỷ niệm đang chờ bạn",
-            body: "Hôm nay bạn chưa ghi lại khoảnh khắc nào, dành 1 phút nhé! 📝",
+            body: "Hôm nay bạn chưa ghi lại khoảnh khắc nào, đừng quên nhé!!!📝",
             url: "/"
         });
 
         pendingSubs.forEach(sub => {
-            webpush.sendNotification({
+            const pushConfig = {
                 endpoint: sub.endpoint,
                 keys: sub.keys
-            }, payload).catch(err => {
-                if (err.statusCode === 410) {
-                    Subscription.findByIdAndDelete(sub._id).exec();
+            };
+
+            webpush.sendNotification(pushConfig, payload).catch(err => {
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    Subscription.deleteOne({ _id: sub._id }).exec();
+                    console.log(`🗑️ Đã xóa sub hết hạn: ${sub.deviceId}`);
                 }
             });
         });

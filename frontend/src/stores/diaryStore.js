@@ -21,16 +21,21 @@ export const useDiaryStore = defineStore('diary', {
         deviceId: DEVICE_ID,
         isAnalyzing: false,
         currentTags: [],
-        isPushSubscribed: false
+        isPushSubscribed: false,
+        hasPromptedForPush: false
     }),
 
     persist: {
         key: 'visual-memoir-storage',
         storage: localStorage,
-        paths: ['items', 'isPushSubscribed']
+        paths: ['items', 'isPushSubscribed', 'hasPromptedForPush']
     },
 
     actions: {
+        setPrompted() {
+            this.hasPromptedForPush = true;
+        },
+
         getDeviceId() {
             return DEVICE_ID;
         },

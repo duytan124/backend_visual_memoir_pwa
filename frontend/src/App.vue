@@ -6,6 +6,9 @@ import { useDiaryStore } from './stores/diaryStore';
 const store = useDiaryStore();
 const isNotificationSupported = ref('Notification' in window && 'serviceWorker' in navigator);
 
+// Biến điều khiển hiển thị Modal xin quyền "mồi"
+const showPushPrompt = ref(false);
+
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -17,9 +20,13 @@ const urlBase64ToUint8Array = (base64String) => {
   return outputArray;
 };
 
-const setupPushNotifications = async () => {
-  if (!isNotificationSupported.value) return;
-  
+// Hàm xử lý khi user nhấn "Đồng ý" trên Modal
+const handleAcceptPush = async () => {
+  showPushPrompt.value = false;
+
+  // Đánh dấu vào store để không hỏi lại nữa (Cần thêm hasPromptedForPush vào store như đã bàn)
+  if (store.setPrompted) store.setPrompted();
+
   try {
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
@@ -32,27 +39,32 @@ const setupPushNotifications = async () => {
       });
 
       await store.subscribePush(subscription);
-      console.log("✅ Đã tự động đăng ký thông báo.");
+      console.log("✅ Đăng ký thông báo thành công.");
     }
   } catch (error) {
-    console.warn("⚠️ Không thể tự động đăng ký:", error);
+    console.warn("⚠️ Lỗi đăng ký:", error);
   }
 };
 
+// Hàm đóng modal khi user chọn "Để sau"
+const handleDeclinePush = () => {
+  showPushPrompt.value = false;
+  if (store.setPrompted) store.setPrompted();
+};
+
 onMounted(() => {
-  if (isNotificationSupported.value) {
-    const shouldRegister = Notification.permission === 'default' ||
-      (Notification.permission === 'granted' && !store.isPushSubscribed);
+  // 1. Kiểm tra nếu đang chạy ở chế độ Standalone (đã Add to Home Screen)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-    if (shouldRegister) {
-      const triggerOnce = () => {
-        setupPushNotifications();
-        window.removeEventListener('click', triggerOnce);
-        window.removeEventListener('touchstart', triggerOnce);
-      };
+  if (isNotificationSupported.value && isStandalone) {
+    // 2. Chỉ hiện Modal nếu chưa đăng ký Push và chưa từng hiện bảng hỏi (dựa vào store)
+    const needsPrompt = Notification.permission === 'default' && !store.isPushSubscribed && !store.hasPromptedForPush;
 
-      window.addEventListener('click', triggerOnce);
-      window.addEventListener('touchstart', triggerOnce);
+    if (needsPrompt) {
+      // Đợi 2 giây cho mượt rồi mới hiện bảng mời
+      setTimeout(() => {
+        showPushPrompt.value = true;
+      }, 2000);
     }
   }
 });
@@ -60,6 +72,20 @@ onMounted(() => {
 
 <template>
   <div class="app-shell">
+    <transition name="slide-up">
+      <div v-if="showPushPrompt" class="push-overlay">
+        <div class="push-card">
+          <div class="push-icon">🔔</div>
+          <h3>Nhắc nhở kỷ niệm</h3>
+          <p>Cho phép mình nhắc bạn ghi lại những khoảnh khắc đẹp vào 19:00 mỗi tối nhé?</p>
+          <div class="push-actions">
+            <button @click="handleDeclinePush" class="btn-later">Để sau</button>
+            <button @click="handleAcceptPush" class="btn-primary">Bật thông báo</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <main class="content-area">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -113,5 +139,81 @@ body {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+
+.push-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: flex-end;
+  backdrop-filter: blur(4px);
+}
+
+.push-card {
+  background: white;
+  width: 100%;
+  padding: 24px;
+  border-radius: 24px 24px 0 0;
+  text-align: center;
+  box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.push-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.push-card h3 {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.push-card p {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.push-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.push-actions button {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-later {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.btn-primary {
+  background: #6366f1;
+  color: white;
+}
+
+/* Hiệu ứng trượt lên */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.4s ease, opacity 0.4s;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+  opacity: 0;
 }
 </style>
