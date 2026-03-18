@@ -205,34 +205,8 @@ app.post('/api/subscribe', async (req, res) => {
     }
 });
 
-// Route để test thông báo ngay lập tức
-app.post('/api/test-push', async (req, res) => {
-    const { deviceId } = req.body;
-    if (!deviceId) return res.status(400).json({ error: "Thiếu deviceId để test" });
 
-    try {
-        const sub = await Subscription.findOne({ deviceId });
-        if (!sub) return res.status(404).json({ error: "Thiết bị này chưa đăng ký nhận thông báo (Subscription not found)" });
-
-        const payload = JSON.stringify({
-            title: "🚀 Test Thông Báo Thành Công!",
-            body: "Chào Tân, đây là thông báo thử nghiệm từ hệ thống Visual Memoir AI của bạn.",
-            url: "/"
-        });
-
-        await webpush.sendNotification({
-            endpoint: sub.endpoint,
-            keys: sub.keys
-        }, payload);
-
-        res.json({ success: true, message: "Đã gửi lệnh push thành công!" });
-    } catch (err) {
-        console.error("Lỗi khi test push:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-cron.schedule('0 19 * * *', async () => {
+cron.schedule('0 8 * * *', async () => {
     console.log("⏰ [Cron] Đang quét nhắc nhở...");
     try {
         const todayVN = moment.tz("Asia/Ho_Chi_Minh").startOf('day').toDate();
@@ -244,7 +218,7 @@ cron.schedule('0 19 * * *', async () => {
         });
         const payload = JSON.stringify({
             title: "✨ Kỷ niệm đang chờ bạn",
-            body: "Hôm nay bạn chưa ghi lại khoảnh khắc nào, đừng quên nhé!!!📝",
+            body: "Đừng quên ghi lại những khoảnh khắc đáng nhớ cho ngày hôm nay nhé!",
             url: "/"
         });
 
