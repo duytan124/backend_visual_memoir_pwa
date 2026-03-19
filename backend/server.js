@@ -1,4 +1,4 @@
-const express = require('express');
+import express from 'express';
 const mongoose = require('mongoose');
 const cors = require('cors');
 const axios = require('axios');
@@ -11,7 +11,7 @@ const Diary = require('./models/diarySchema');
 const Subscription = require('./models/subscriptionSchema');
 
 const app = express();
-const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com/";
+const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com";
 
 // 1. Cấu hình Cloudinary
 cloudinary.config({

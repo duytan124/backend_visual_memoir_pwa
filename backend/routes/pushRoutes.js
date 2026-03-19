@@ -1,4 +1,4 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 const Subscription = require('../models/subscriptionSchema');
 
@@ -13,7 +13,7 @@ router.post('/subscribe', async (req, res) => {
                 keys: subscription.keys,
                 deviceId
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         res.status(201).json({ message: "Đã lưu đăng ký thông báo!" });
