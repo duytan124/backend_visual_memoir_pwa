@@ -20,7 +20,6 @@ export const useDiaryStore = defineStore('diary', {
         items: [],
         deviceId: DEVICE_ID,
         isAnalyzing: false,
-        currentTags: [],
         isPushSubscribed: false,
         hasPromptedForPush: false
     }),
@@ -55,7 +54,7 @@ export const useDiaryStore = defineStore('diary', {
                 const deviceId = this.getDeviceId();
                 const res = await axios.get(`${API_URL}/diaries`, {
                     params: { deviceId },
-                    timeout: 5000
+                    timeout: 8000
                 });
                 if (res.data) {
                     this.items = res.data;
@@ -75,7 +74,6 @@ export const useDiaryStore = defineStore('diary', {
                     deviceId: deviceId,
                 });
                 this.items.unshift(res.data);
-                this.currentTags = [];
                 return res.data;
             } catch (error) {
                 console.error("❌ Lỗi lưu nhật ký:", error.message);
@@ -86,14 +84,10 @@ export const useDiaryStore = defineStore('diary', {
         async analyzeImage(base64Image, userContext) {
             this.isAnalyzing = true;
             try {
-                const response = await axios.post(`${API_URL}/analyze`, {
+                const response = await axios.post(`${API_URL}/diaries/analyze`, {
                     image: base64Image,
                     context: userContext || ""
                 });
-
-                if (response.data.tags) {
-                    this.currentTags = response.data.tags;
-                }
 
                 return response.data.text;
             } catch (error) {
@@ -131,7 +125,7 @@ export const useDiaryStore = defineStore('diary', {
         async subscribePush(subscription) {
             try {
                 const deviceId = this.getDeviceId();
-                await axios.post(`${API_URL}/subscribe`, {
+                await axios.post(`${API_URL}/push/subscribe`, {
                     subscription: subscription,
                     deviceId: deviceId,
                 });

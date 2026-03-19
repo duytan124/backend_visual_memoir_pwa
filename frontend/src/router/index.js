@@ -24,4 +24,4 @@ const router = createRouter({
     routes,
 });
 
-export default router; // Thường dùng export default cho router
+export default router;
