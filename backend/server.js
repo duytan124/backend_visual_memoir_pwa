@@ -1,4 +1,4 @@
-import express from 'express';
+const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const axios = require('axios');
@@ -7,8 +7,8 @@ const cloudinary = require('cloudinary').v2;
 const webpush = require('web-push');
 const cron = require('node-cron');
 const moment = require('moment-timezone');
-const Diary = require('./models/diarySchema');
-const Subscription = require('./models/subscriptionSchema');
+const Diary = require('./models/diarySchema.js');
+const Subscription = require('./models/subscriptionSchema.js');
 
 const app = express();
 const BACKEND_URL = "https://backend-visual-memoir-pwa.onrender.com";

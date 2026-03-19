@@ -1,6 +1,6 @@
-import express from 'express';
+const express = require('express');
 const router = express.Router();
-const Subscription = require('../models/subscriptionSchema');
+const Subscription = require('../models/subscriptionSchema.js');
 
 router.post('/subscribe', async (req, res) => {
     try {

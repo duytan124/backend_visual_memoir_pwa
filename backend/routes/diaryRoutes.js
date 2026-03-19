@@ -1,6 +1,6 @@
-import express from 'express';
+const express = require('express');
 const router = express.Router();
-const Diary = require('../models/diarySchema');
+const Diary = require('../models/diarySchema.js');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const cloudinary = require('cloudinary').v2;
 
