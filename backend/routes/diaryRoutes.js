@@ -104,12 +104,15 @@ router.delete('/:id', async (req, res) => {
 // Route cập nhật nội dung nhật ký
 router.put('/:id', async (req, res) => {
     try {
-        const { content, userContext } = req.body;
+        const { content, userContext, isFavorite } = req.body;
         const updatedDiary = await Diary.findByIdAndUpdate(
             req.params.id,
-            { content, userContext },
+            { content, userContext, isFavorite},
             { new: true }
         );
+        if (!updatedDiary) {
+            return res.status(404).json({ error: "Không tìm thấy kỷ niệm" });
+        }
         res.json(updatedDiary);
     } catch (error) {
         res.status(500).json({ error: "Lỗi cập nhật" });

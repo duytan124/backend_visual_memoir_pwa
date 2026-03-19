@@ -24,7 +24,6 @@ const urlBase64ToUint8Array = (base64String) => {
 const handleAcceptPush = async () => {
   showPushPrompt.value = false;
 
-  // Đánh dấu vào store để không hỏi lại nữa (Cần thêm hasPromptedForPush vào store như đã bàn)
   if (store.setPrompted) store.setPrompted();
 
   try {
@@ -53,15 +52,11 @@ const handleDeclinePush = () => {
 };
 
 onMounted(() => {
-  // 1. Kiểm tra nếu đang chạy ở chế độ Standalone (đã Add to Home Screen)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
   if (isNotificationSupported.value && isStandalone) {
-    // 2. Chỉ hiện Modal nếu chưa đăng ký Push và chưa từng hiện bảng hỏi (dựa vào store)
     const needsPrompt = Notification.permission === 'default' && !store.isPushSubscribed && !store.hasPromptedForPush;
-
     if (needsPrompt) {
-      // Đợi 2 giây cho mượt rồi mới hiện bảng mời
       setTimeout(() => {
         showPushPrompt.value = true;
       }, 2000);

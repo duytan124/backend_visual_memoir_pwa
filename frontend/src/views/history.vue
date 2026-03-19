@@ -1,11 +1,43 @@
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useDiaryStore } from '../stores/diaryStore';
 
 const store = useDiaryStore();
+const viewMode = ref('all');
 
 onMounted(async () => {
     await store.fetchAll();
+});
+
+const filteredItems = computed(() => {
+    if (viewMode.value === 'all') return store.items;
+
+    if (viewMode.value === 'favorites') {
+        return store.items.filter(item => item.isFavorite);
+    }
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    return store.items.filter(item => {
+        const itemDate = new Date(item.createdAt);
+        const itemTime = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate()).getTime();
+
+        if (viewMode.value === 'day') {
+            return itemTime === today;
+        }
+
+        if (viewMode.value === 'week') {
+            const sevenDaysAgo = today - (7 * 24 * 60 * 60 * 1000);
+            return itemTime >= sevenDaysAgo && itemTime <= today;
+        }
+
+        if (viewMode.value === 'month') {
+            return itemDate.getMonth() === now.getMonth() &&
+                itemDate.getFullYear() === now.getFullYear();
+        }
+        return true;
+    });
 });
 
 const convertPath = (path) => store.getDisplayPath(path);
@@ -29,6 +61,17 @@ const handleMobileShare = async (item) => {
     }
 };
 
+const toggleFavorite = async (item) => {
+    const newStatus = !item.isFavorite;
+
+    try {
+        await store.updateDiary(item._id, { isFavorite: newStatus });
+        if (navigator.vibrate) navigator.vibrate(50);
+    } catch (err) {
+        console.error("Không thể cập nhật yêu thích:", err);
+    }
+};
+
 const formatTime = (dateStr) => {
     return new Date(dateStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 };
@@ -43,14 +86,21 @@ const formatDate = (dateStr) => {
         <header class="page-header">
             <div class="header-content">
                 <h2>Dòng thời gian</h2>
-                <p class="count">{{ store.items.length }} kỷ niệm</p>
+                <div class="filter-bar">
+                    <button :class="{ active: viewMode === 'all' }" @click="viewMode = 'all'">Tất cả</button>
+                    <button :class="{ active: viewMode === 'favorites' }" @click="viewMode = 'favorites'">Yêu thích</button>
+                    <button :class="{ active: viewMode === 'day' }" @click="viewMode = 'day'">Hôm nay</button>
+                    <button :class="{ active: viewMode === 'week' }" @click="viewMode = 'week'">Tuần</button>
+                    <button :class="{ active: viewMode === 'month' }" @click="viewMode = 'month'">Tháng</button>
+                </div>
+                <p class="count">{{ filteredItems.length }} kỷ niệm được tìm thấy</p>
             </div>
         </header>
 
         <div class="scroll-area">
             <div v-if="store.items.length === 0" class="empty-state">
                 <div class="empty-icon">📸</div>
-                <p>Chưa có kỷ niệm nào...</p>
+                <p>Không có kỷ niệm nào trong thời gian này.</p>
                 <button @click="$router.push('/')" class="btn-go-home">Tạo ngay</button>
             </div>
 
@@ -65,6 +115,11 @@ const formatDate = (dateStr) => {
                     <div class="entry-card">
                         <div class="image-wrapper" @click="$router.push(`/detail/${item._id}`)">
                            <img :src="convertPath(item.imagePath)" alt="Memory" crossorigin="anonymous" loading="eager" />
+                        </div>
+
+                        <div class="heart-btn" :class="{ 'is-active': item.isFavorite }"
+                            @click.stop="toggleFavorite(item)">
+                            <img src="/heart.png" alt="heart" class="heart-img" />
                         </div>
 
                         <div class="text-wrapper">
@@ -89,6 +144,54 @@ const formatDate = (dateStr) => {
 </template>
 
 <style scoped>
+.filter-bar {
+    display: flex;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 12px;
+    margin: 15px 0 10px;
+    gap: 4px;
+}
+
+.filter-bar button {
+    flex: 1;
+    border: none;
+    padding: 8px 5px;
+    border-radius: 9px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    background: transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.filter-bar button.active {
+    background: white;
+    color: #6366f1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.count {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 5px;
+}
+
+.btn-clear {
+    margin-top: 15px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.timeline-list::before {
+    left: 77px;
+}
+
 .history-page {
     display: flex;
     flex-direction: column;
@@ -132,7 +235,6 @@ const formatDate = (dateStr) => {
     position: relative;
 }
 
-/* Chấm xanh trên timeline */
 .timeline-item::after {
     content: '';
     position: absolute;
@@ -226,5 +328,50 @@ const formatDate = (dateStr) => {
 .btn-share-mobile:active {
     background: #dbeafe;
     transform: scale(0.95);
+}
+
+.image-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    overflow: hidden;
+}
+
+.heart-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(4px);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.heart-img {
+    width: 20px;
+    height: 20px;
+    transition: all 0.3s;
+    filter: grayscale(1) opacity(0.6);
+}
+
+.heart-btn.is-active {
+    background: white;
+    transform: scale(1.1);
+}
+
+.heart-btn.is-active .heart-img {
+    filter: invert(27%) sepia(91%) saturate(6478%) hue-rotate(349deg) brightness(105%) contrast(100%);
+}
+
+.heart-btn:active {
+    transform: scale(0.8);
 }
 </style>

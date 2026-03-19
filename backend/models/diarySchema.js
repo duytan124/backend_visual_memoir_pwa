@@ -5,6 +5,7 @@ const diarySchema = new mongoose.Schema({
     publicId: String,
     content: String,
     userContext: String,
+    isFavorite: { type: Boolean, default: false },
     deviceId: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
 });
