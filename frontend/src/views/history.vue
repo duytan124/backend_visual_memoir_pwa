@@ -105,7 +105,7 @@ const formatDate = (dateStr) => {
             </div>
 
             <div v-else class="timeline-list">
-                <div v-for="item in store.items" :key="item._id" class="timeline-item">
+                <div v-for="item in filteredItems" :key="item._id" class="timeline-item">
 
                     <div class="time-column">
                         <span class="hour">{{ formatTime(item.createdAt) }}</span>
@@ -119,7 +119,10 @@ const formatDate = (dateStr) => {
 
                         <div class="heart-btn" :class="{ 'is-active': item.isFavorite }"
                             @click.stop="toggleFavorite(item)">
-                            <img src="/heart.png" alt="heart" class="heart-img" />
+                            <img v-if="item.isFavorite" src="/heart_color.png" alt="heart-color"
+                                class="heart-img active-heart" />
+
+                            <img v-else src="/heart.png" alt="heart-empty" class="heart-img" />
                         </div>
 
                         <div class="text-wrapper">
@@ -358,20 +361,36 @@ const formatDate = (dateStr) => {
 .heart-img {
     width: 20px;
     height: 20px;
-    transition: all 0.3s;
-    filter: grayscale(1) opacity(0.6);
-}
-
-.heart-btn.is-active {
-    background: white;
-    transform: scale(1.1);
-}
-
-.heart-btn.is-active .heart-img {
-    filter: invert(27%) sepia(91%) saturate(6478%) hue-rotate(349deg) brightness(105%) contrast(100%);
+    transition: transform 0.2s ease;
 }
 
 .heart-btn:active {
     transform: scale(0.8);
+}
+
+@keyframes heart-pop {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    70% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.active-heart {
+    animation: heart-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.heart-btn.is-active {
+    background: white;
+    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.15);
 }
 </style>
