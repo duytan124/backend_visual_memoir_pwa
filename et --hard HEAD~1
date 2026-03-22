@@ -1,0 +1,55 @@
+[33mc2f95b0[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m add cron for a day
+[33m29c0f04[m add cron for a day
+[33mefb2e06[m update UI for favorite/heart
+[33m70c6453[m add favorite heart functionality
+[33m9e9c6c5[m update
+[33mdbedd54[m update
+[33m6afdc4c[m update
+[33m30750a1[m update
+[33m2928170[m update
+[33mbda7d72[m update project structure
+[33m89bef32[m Update  Notification Service
+[33me4ecca3[m Test  Notification Service
+[33mf596f07[m Update Notification Service
+[33mb08cbae[m Update Notification Service
+[33m0523d1e[m Update Notification Service
+[33m57dee19[m update notificationService
+[33m29b139a[m add notificationService
+[33mcb4d499[m update promt AI
+[33m62891a9[m add voice for input and logic promt AI
+[33mb622bb8[m update
+[33mc7d48a0[m update
+[33m3c75d22[m update
+[33macb7976[m update
+[33m156dc1c[m update chat box
+[33m3bffb71[m add chat box
+[33mc97a324[m add chat box
+[33m5b63e74[m update
+[33m3e4d6e1[m update
+[33mcb39695[m update
+[33m4c410ec[m update
+[33m4dbeef0[m update
+[33mdb44a61[m update
+[33m63ddfee[m update
+[33mb5e5aef[m update
+[33m999f4e0[m update
+[33medc3ff4[m update
+[33m276592a[m update
+[33m4965c92[m update
+[33m14f268d[m update
+[33m817b1ee[m update
+[33m0cccaf3[m update
+[33m8bcd92a[m update
+[33mb093308[m update
+[33m962a81a[m delete favoritepage and add deviceID
+[33m683aed0[m update UI
+[33mca4f1b6[m update history page
+[33mc2ec302[m update nén ảnh
+[33m2e984fd[m Tối ưu nén ảnh và giữ server luôn thức
+[33ma1d2850[m Fix Gemini model and MongoDB connection logic
+[33mbb9540d[m update backend
+[33mb925387[m Cấu trúc lại thư mục: Đẩy cả frontend và backend
+[33mbe60f1e[m Bảo mật: Loại bỏ file .env khỏi GitHub
+[33m47ed94e[m update backend
+[33m4aa9946[m update backend
+[33m4edce93[m backend of project

@@ -54,7 +54,7 @@ export const useDiaryStore = defineStore('diary', {
                 const deviceId = this.getDeviceId();
                 const res = await axios.get(`${API_URL}/diaries`, {
                     params: { deviceId },
-                    timeout: 3000
+                    timeout: 8000
                 });
                 if (res.data) {
                     this.items = res.data;
